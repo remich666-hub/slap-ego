@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Slap Ego</title>
+</head>
+<body>
+<style>
+  /* Layout : un seul canvas 9:16 centré (plein écran sur téléphone). Tout le texte (HUD, menu, fin) est dessiné dans le canvas avec une police bitmap embarquée : aucun appel externe. */
+  :root { --ink: #160d1c; color-scheme: dark; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--ink); -webkit-user-select: none; user-select: none; touch-action: none; }
+  #stage { position: fixed; inset: 0; display: grid; place-items: center; background: var(--ink); }
+  #c { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: block; image-rendering: pixelated; touch-action: none; cursor: pointer; }
+  #safe { position: fixed; top: 0; left: 0; width: 0; height: 0; padding-top: env(safe-area-inset-top, 0px); visibility: hidden; pointer-events: none; }
+</style>
+<div id="stage"><canvas id="c" aria-label="Slap Ego"></canvas></div>
+<div id="safe"></div>
+<script>
+(() => {
+'use strict';
+// ---------- SDK YouTube Playables (absent hors de YouTube : le jeu tourne alors en mode aperçu) ----------
+const YT = (typeof ytgame !== 'undefined' && ytgame && ytgame.game) ? ytgame : null;
+const L = {
+  fr: { load: 'CHARGEMENT', tapPlay: 'TOUCHE POUR JOUER', tapAgain: 'TOUCHE POUR REJOUER', best: 'RECORD', newBest: 'NOUVEAU RECORD!', round: n => 'MANCHE ' + n, ego: 'EGO',
+    sub: 'VIDE SON EGO AVANT LA FIN DU CHRONO', tut: ['GLISSE VERS LA GAUCHE', 'GLISSE VERS LA DROITE', 'ALTERNE VITE = X2', 'POELE: NE TAPE PAS!', 'IL TIRE LA LANGUE: GIFLE = CRITIQUE!'], go: 'A TOI !',
+    ar: 'ALLER-RETOUR!', crit: 'CRITIQUE!', pow: ['PAF!', 'CLAC!', 'SBAM!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'AIE...', fight: 'GIFLE!', up: 'IL SE RELEVE!', out: ' EST K.O.!',
+    endLives: 'TA MAIN A LACHE', endTime: 'IL A TENU BON...', stats: (h, a, k) => h + ' CLAQUES - ' + a + ' ALLERS-RETOURS - ' + k + ' K.O.',
+    sub2: 'Vide son ego avant la fin du chrono', missions: 'MISSIONS', missionOk: 'MISSION OK !', trophy: 'TROPHÉE !', trophies: 'TROPHÉES', back: 'TOUCHE POUR REVENIR', newRank: 'NOUVEAU RANG!', next: 'PROCHAIN:',
+    ranks: ['MAIN MOLLE', 'TAPOTEUR', 'CLAQUEUR', 'GIFLEUR', 'BAFFEUR', "PAUME D'OR", 'MAIN DE FER', 'ROI DE LA BAFFE', 'LÉGENDE DE LA BAFFE'],
+    perks: ['', '+1 S PAR MANCHE', 'COMBO PLUS RAPIDE', '4E COEUR', '+2 S PAR MANCHE', 'K.O. = POINTS X2', 'CRITIQUE = POINTS X3', 'MULTI MAX X6', 'TU ES UNE LEGENDE'],
+    ms: { crit: n => 'Fais ' + n + ' critiques', ar: n => n + ' allers-retours', ko: n => n + ' K.O. en 1 partie', pts: n => 'Marque ' + n + ' pts', mult: n => 'Atteins le multi ×' + n,
+      hits: n => 'Donne ' + n + ' claques', reach: n => 'Affronte ' + nice(cname(n)), clean: n => n > 1 ? n + ' K.O. sans encaisser' : 'K.O. sans encaisser' },
+    tr: { k1: 'Premier K.O.', c: n => nice(cname(n)) + ' K.O.', h100: '100 claques', h1k: '1000 claques', m5: 'Multi ×5', cr10: '10 critiques en 1 partie', p5k: '5000 points', p10k: '10000 points',
+      tour: 'Tour complet', r5: 'Manche 5', cl: 'K.O. sans encaisser', leg: 'Légende de la baffe' },
+    perkS: ['', '+1 s par manche', 'Combo plus rapide', 'Un 4e cœur', '+2 s par manche', 'K.O. = points ×2', 'Critique = points ×3', 'Multi max ×6', 'Tu es une légende'],
+    tutT: ['TOUCHE À DROITE', 'TOUCHE À GAUCHE', 'ALTERNE VITE !', 'GARDE : STOP !', 'IL TIRE LA LANGUE'],
+    tutS: ['pour la gifle (ou glisse vers la gauche)', 'pour le revers (ou glisse vers la droite)', 'Gauche, droite, gauche… = aller-retour ×2', 'Quand il se protège, ne tape pas !', 'Gifle-le maintenant : coup critique !'],
+    step: (a, b) => 'ÉTAPE ' + a + ' SUR ' + b, roundKo: (r, k, n) => 'Manche ' + r + (n > 1 ? ' · K.O. ' + k + '/' + n : ''), rankN: r => 'RANG ' + (r + 1),
+    xpOf: (a, b) => fmt(a) + ' / ' + fmt(b) + ' XP', maxRank: 'Rang maximum', nextP: p => 'Prochain : ' + p, perMission: n => '+' + n + ' XP par mission', play: 'JOUER',
+    trophBtn: (a, b) => 'Trophées ' + a + '/' + b, record: 'RECORD', recordIs: n => 'Record : ' + fmt(n), newRec: 'NOUVEAU RECORD !', timeUp: 'TEMPS ÉCOULÉ !',
+    heldOn: n => n + ' a tenu bon…', statLbl: ['claques', 'allers-retours', 'K.O.'], replay: 'REJOUER', revenge: 'REVANCHE !', menuB: 'Menu', handGave: 'Ta main a lâché…', almost: 'PRESQUE !',
+    xpAnyway: n => '+' + n + ' XP quand même', xpLeft: (n, r, p) => [['Plus que ', C.cream], [n + ' XP', C.yel, 700], [' avant ', C.cream], [r, C.yel, 700], [' : ' + p.charAt(0).toLowerCase() + p.slice(1) + ' !', C.cream]],
+    top: 'Tu es au sommet !', closest: 'MISSION LA PLUS PROCHE', tip: 'Astuce :', unlocked: 'Bonus débloqué', cont: 'Touche pour continuer', backB: 'Retour',
+    trophCount: (a, b) => a + ' sur ' + b + ' débloqués',
+    tips: ['quand il se protège, ne tape pas ! Attends qu\'il baisse sa garde : c\'est le moment du critique.', 'alterne gauche et droite : les allers-retours comptent double.',
+      'quand le cadre jaune clignote, gifle : coup critique, et +1 s au chrono.', 'enchaîne sans te faire bloquer pour monter le multiplicateur (+1 s à chaque palier, 5 s max par manche).'] },
+  en: { load: 'LOADING', tapPlay: 'TAP TO PLAY', tapAgain: 'TAP TO PLAY AGAIN', best: 'BEST', newBest: 'NEW BEST!', round: n => 'ROUND ' + n, ego: 'EGO',
+    sub: 'DRAIN HIS EGO BEFORE TIME RUNS OUT', tut: ['SWIPE LEFT', 'SWIPE RIGHT', 'ALTERNATE FAST = X2', 'FRYING PAN: DO NOT HIT!', 'TONGUE OUT: SLAP = CRITICAL!'], go: 'YOUR TURN!',
+    ar: 'DOUBLE SLAP!', crit: 'CRITICAL!', pow: ['WHAP!', 'SMACK!', 'SLAP!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'OUCH...', fight: 'SLAP!', up: 'HE GETS UP!', out: ' IS OUT!',
+    endLives: 'YOUR HAND GAVE UP', endTime: 'HE HELD ON...', stats: (h, a, k) => h + ' SLAPS - ' + a + ' DOUBLE SLAPS - ' + k + ' K.O.',
+    sub2: 'Drain his ego before time runs out', missions: 'MISSIONS', missionOk: 'MISSION DONE!', trophy: 'TROPHY!', trophies: 'TROPHIES', back: 'TAP TO GO BACK', newRank: 'NEW RANK!', next: 'NEXT:',
+    ranks: ['SOFT HAND', 'TAPPER', 'SLAPPER', 'SMACKER', 'WALLOPER', 'GOLDEN PALM', 'IRON HAND', 'SLAP KING', 'SLAP LEGEND'],
+    perks: ['', '+1 S PER ROUND', 'FASTER COMBO', '4TH HEART', '+2 S PER ROUND', 'K.O. = 2X POINTS', 'CRITICAL = 3X POINTS', 'MAX COMBO X6', 'YOU ARE A LEGEND'],
+    ms: { crit: n => 'Land ' + n + ' criticals', ar: n => n + ' double slaps', ko: n => n + ' K.O. in 1 game', pts: n => 'Score ' + n + ' pts', mult: n => 'Reach ×' + n + ' combo',
+      hits: n => 'Give ' + n + ' slaps', reach: n => 'Face ' + nice(cname(n)), clean: n => n > 1 ? n + ' flawless K.O.' : 'Flawless K.O.' },
+    tr: { k1: 'First K.O.', c: n => nice(cname(n)) + ' K.O.', h100: '100 slaps', h1k: '1000 slaps', m5: '×5 combo', cr10: '10 criticals in 1 game', p5k: '5000 points', p10k: '10000 points',
+      tour: 'Full tour', r5: 'Round 5', cl: 'Flawless K.O.', leg: 'Slap legend' },
+    perkS: ['', '+1 s per round', 'Faster combo', 'A 4th heart', '+2 s per round', 'K.O. = 2× points', 'Critical = 3× points', 'Max combo ×6', 'You are a legend'],
+    tutT: ['TAP RIGHT', 'TAP LEFT', 'ALTERNATE FAST!', 'GUARD UP: STOP!', 'TONGUE OUT!'],
+    tutS: ['for the slap (or swipe left)', 'for the backhand (or swipe right)', 'Left, right, left… = double slap ×2', 'When he shields himself, don\'t hit!', 'Slap him now: critical hit!'],
+    step: (a, b) => 'STEP ' + a + ' OF ' + b, roundKo: (r, k, n) => 'Round ' + r + (n > 1 ? ' · K.O. ' + k + '/' + n : ''), rankN: r => 'RANK ' + (r + 1),
+    xpOf: (a, b) => fmt(a) + ' / ' + fmt(b) + ' XP', maxRank: 'Max rank', nextP: p => 'Next: ' + p, perMission: n => '+' + n + ' XP per mission', play: 'PLAY',
+    trophBtn: (a, b) => 'Trophies ' + a + '/' + b, record: 'BEST', recordIs: n => 'Best: ' + fmt(n), newRec: 'NEW BEST!', timeUp: 'TIME UP!',
+    heldOn: n => n + ' held on…', statLbl: ['slaps', 'double slaps', 'K.O.'], replay: 'PLAY AGAIN', revenge: 'REVENGE!', menuB: 'Menu', handGave: 'Your hand gave up…', almost: 'SO CLOSE!',
+    xpAnyway: n => '+' + n + ' XP anyway', xpLeft: (n, r, p) => [['Only ', C.cream], [n + ' XP', C.yel, 700], [' to ', C.cream], [r, C.yel, 700], [': ' + p.charAt(0).toLowerCase() + p.slice(1) + '!', C.cream]],
+    top: 'You are at the top!', closest: 'CLOSEST MISSION', tip: 'Tip:', unlocked: 'Bonus unlocked', cont: 'Tap to continue', backB: 'Back',
+    trophCount: (a, b) => a + ' of ' + b + ' unlocked',
+    tips: ['when he shields himself, don\'t hit! Wait for his guard to drop: that\'s your critical moment.', 'alternate left and right: double slaps count twice.',
+      'when the yellow frame flashes, slap: critical hit, and +1 s on the clock.', 'chain hits without getting blocked to raise the multiplier (+1 s per tier, 5 s max per round).'] },
+};
+let T = (navigator.language || '').toLowerCase().startsWith('fr') ? L.fr : L.en;
+const setLang = l => { T = String(l || '').toLowerCase().startsWith('fr') ? L.fr : L.en; };
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random()*(b - a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const ease = t => { t = clamp(t, 0, 1); return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; };
+
+// ---------- Sauvegarde : uniquement via le SDK (loadData attendu avant tout saveData) ----------
+let best = 0, tutDone = false, saveOk = false, dataReady = !YT;
+// progression : XP (rang), 3 missions en cours, totaux et trophées
+let xp = 0, missions = [], TOT = { hits: 0, kos: 0, ko: [] }, TROPH = [];
+const progData = () => ({ xp, ms: missions.map(m => ({ k: m.k, n: m.n, p: m.p || 0 })), tot: TOT, tr: TROPH });
+function readProg(o) {
+  if (!o) return; xp = +o.xp || 0; TROPH = Array.isArray(o.tr) ? o.tr.filter(x => typeof x === 'string') : [];
+  if (o.tot) TOT = { hits: +o.tot.hits || 0, kos: +o.tot.kos || 0, ko: Array.isArray(o.tot.ko) ? o.tot.ko.map(v => +v || 0) : [] };
+  if (Array.isArray(o.ms)) missions = o.ms.filter(m => m && m.k && m.n).map(m => ({ k: m.k, n: +m.n, p: +m.p || 0 }));
+}
+function save() {
+  if (YT) { if (saveOk) { try { YT.game.saveData(JSON.stringify(Object.assign({ v: 2, best, tut: tutDone ? 1 : 0 }, progData()))).catch(() => {}); } catch (e) {} } return; }
+  
+}
+if (YT) {
+  try { YT.game.loadData().then(d => { try { const o = JSON.parse(d || '{}'); best = +o.best || 0; tutDone = !!o.tut; readProg(o); } catch (e) {} saveOk = true; dataReady = true; }, () => { dataReady = true; }); } catch (e) { dataReady = true; }
+  try { const p = YT.system.getLanguage && YT.system.getLanguage(); if (p && p.then) p.then(setLang, () => {}); } catch (e) {}
+}
+
+
+// ---------- Police bitmap 5 × 7 embarquée ----------
+const FONT = {
+  A: [14,17,17,31,17,17,17], B: [30,17,17,30,17,17,30], C: [14,17,16,16,16,17,14], D: [30,17,17,17,17,17,30], E: [31,16,16,30,16,16,31], F: [31,16,16,30,16,16,16],
+  G: [14,17,16,23,17,17,15], H: [17,17,17,31,17,17,17], I: [14,4,4,4,4,4,14], J: [7,2,2,2,2,18,12], K: [17,18,20,24,20,18,17], L: [16,16,16,16,16,16,31],
+  M: [17,27,21,21,17,17,17], N: [17,25,21,19,17,17,17], O: [14,17,17,17,17,17,14], P: [30,17,17,30,16,16,16], Q: [14,17,17,17,21,18,13], R: [30,17,17,30,20,18,17],
+  S: [15,16,16,14,1,1,30], T: [31,4,4,4,4,4,4], U: [17,17,17,17,17,17,14], V: [17,17,17,17,17,10,4], W: [17,17,17,21,21,27,17], X: [17,17,10,4,10,17,17],
+  Y: [17,17,10,4,4,4,4], Z: [31,1,2,4,8,16,31],
+  0: [14,17,19,21,25,17,14], 1: [4,12,4,4,4,4,14], 2: [14,17,1,2,4,8,31], 3: [30,1,1,14,1,1,30], 4: [2,6,10,18,31,2,2], 5: [31,16,30,1,1,17,14],
+  6: [6,8,16,30,17,17,14], 7: [31,1,2,4,8,8,8], 8: [14,17,17,14,17,17,14], 9: [14,17,17,15,1,2,12],
+  '!': [4,4,4,4,4,0,4], '.': [0,0,0,0,0,0,4], ',': [0,0,0,0,0,4,8], ':': [0,0,4,0,4,0,0], '+': [0,4,4,31,4,4,0], '-': [0,0,0,14,0,0,0], "'": [4,4,0,0,0,0,0],
+  '?': [14,17,1,2,4,0,4], '/': [1,1,2,4,8,16,16], '<': [0,4,8,31,8,4,0], '>': [0,4,2,31,2,4,0], '=': [0,0,31,0,31,0,0],
+};
+const norm = s => String(s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u2018\u2019]/g, "'");
+const tw = (s, sc) => s.length*6*sc - sc;
+
+// ---------- Sprites : 6 planches de 11 × 4 cases de 180 × 320 (44 images par planche) ----------
+const FW = 180, FH = 320, COLS = 11;
+const R = (a, b) => { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; };
+const PP = a => a.concat(a.slice(1, -1).reverse());
+// Un perso = ses planches (assets/<pre>N.webp), ses sons (assets/<sp>nom.mp3) et sa table d'animations
+const CH = [
+  { name: { fr: 'LE BEAUF', en: 'THE SLOB' }, pre: 's', sp: '', n: 6, per: 44, imgs: [], loaded: 0, A: {
+  idle:    { f: PP(R(44, 52)), fps: 9.6, loop: true },
+  fore:    { f: R(2, 19), fps: 12, hit: 2, free: 6 },
+  back:    { f: [19, 20, 21, 22, 24, 26, 28, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44], fps: 12, hit: 2, free: 6 },
+  taunt:   { f: R(53, 87), fps: 12, crit: [12, 27] },                 // critique seulement quand il tire la langue
+  up:      { f: R(88, 95), fps: 12, pan: 3 },
+  guard:   { f: PP(R(96, 106)), fps: 10, loop: true, pan: 0 },
+  down:    { f: R(107, 132), fps: 12, panUntil: 2, crit: [9, 25] },
+  block:   { f: R(142, 154), fps: 14, hit: 2 },
+  recover: { f: R(160, 172), fps: 14 },
+  ko:      { f: R(173, 212), fps: 12, hit: 0 },
+  enter:   { f: R(213, 237), fps: 12 },
+  } },
+  { name: { fr: "LE CHEF", en: "THE BOSS" }, pre: "c", sp: "c_", n: 8, per: 33, imgs: [], loaded: 0, parry: '255,216,74', clangTxt: 'CLAC!', A: {
+    idle: {f:[0,1,2,3,4,5,6,7,8,9,8,7,6,5,4,3,2,1],fps:9.6,loop:true},
+    fore: {f:[10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34],fps:12,hit:3,free:7},
+    back: {f:[35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56],fps:12,hit:4,free:8},
+    taunt: {f:[57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97],fps:13,crit:[19,31]},
+    up: {f:[98,99,100,101,102,103,104,105,106,107,108],fps:12,pan:3},
+    guard: {f:[109,110,111,112,113,114,115,116,117,118,119,120,121,122,121,120,119,118,117,116,115,114,113,112,111,110],fps:10,loop:true,pan:0},
+    down: {f:[123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150],fps:12,panUntil:4,crit:[8,24]},
+    block: {f:[151,152,153,154,155,156,157,158,159,160,161,162,163],fps:14,hit:3},
+    recover: {f:[164,165,166,167,168,169,170,171,172,173,174,175,176,177,178],fps:14},
+    ko: {f:[179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215],fps:12,hit:0},
+    enter: {f:[216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245],fps:12}
+  } },
+  { name: { fr: "L'INFLUENCEUR", en: "THE INFLUENCER" }, pre: "i", sp: "i_", n: 11, per: 33, imgs: [], loaded: 0, parry: '255,255,255', clangTxt: 'FLASH!', mock: true, A: {
+    idle: {f:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],fps:7,loop:true},
+    fore: {f:[23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46],fps:12,hit:2,free:7},
+    back: {f:[47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70],fps:12,hit:2,free:7},
+    taunt: {f:[71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96],fps:13,crit:[3,18]},
+    up: {f:[97,98,99,100,101,102,103],fps:12,pan:3},
+    guard: {f:[104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105],fps:10,loop:true,pan:0},
+    down: {f:[129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157],fps:12,panUntil:4,crit:[6,20]},
+    block: {f:[158,159,160,161,162,163,164,165,166,167,168,169,170,171,172],fps:14,hit:3},
+    recover: {f:[173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195],fps:14},
+    ko: {f:[196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231],fps:12,hit:0},
+    enter: {f:[232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257],fps:12},
+    taunt2: {f:[258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296],fps:13,crit:[3,30]},
+    taunt3: {f:[297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330],fps:12,crit:[4,26]}
+  } },
+  { name: { fr: "LE COACH", en: "THE COACH" }, pre: "g", sp: "g_", n: 10, per: 33, imgs: [], loaded: 0, parry: '255,216,74', mock: true, A: {
+    idle: {f:[0,1,2,3,4,5,6,7,8,9,8,7,6,5,4,3,2,1],fps:7,loop:true},
+    fore: {f:[10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32],fps:12,hit:0,free:7},
+    back: {f:[33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55],fps:12,hit:0,free:7},
+    taunt: {f:[56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90],fps:13,crit:[3,20]},
+    up: {f:[91,92,93,94,95,96],fps:12,pan:1},
+    guard: {f:[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,128,127,126,125,124,123,122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98],fps:10,loop:true,pan:0},
+    down: {f:[130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154],fps:12,panUntil:4,crit:[6,20]},
+    block: {f:[155,156,157,158,159,160,161,162,163,164],fps:14,hit:0},
+    recover: {f:[165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182],fps:14},
+    ko: {f:[183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220],fps:12,hit:0},
+    enter: {f:[221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246],fps:12},
+    taunt2: {f:[247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288],fps:13,crit:[10,26]},
+    ouch: {f:[289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314],fps:14}
+  } },
+];
+function loadChar(c) { if (c.imgs.length) return; for (let i = 0; i < c.n; i++) { const im = new Image(); im.onload = () => { c.loaded++; }; im.src = 'assets/' + c.pre + i + '.webp'; c.imgs.push(im); } }
+const ready = c => c.loaded === c.n;
+loadChar(CH[0]);
+[['SG', 'sg.woff2', '300 700'], ['PX', 'px400.woff2', '400'], ['PX', 'px700.woff2', '700']].forEach(([n, f, w]) => { try { new FontFace(n, 'url(assets/' + f + ')', { weight: w }).load().then(ff => { document.fonts.add(ff); }).catch(() => {}); } catch (e) {} });   // polices embarquées
+let ci = 0, A = CH[0].A;
+function setChar(k) { ci = k; A = CH[k].A; }
+const charName = () => CH[ci].name[T === L.fr ? 'fr' : 'en'];
+const cname = k => CH[Math.min(k, CH.length - 1)].name[T === L.fr ? 'fr' : 'en'];
+
+// ---------- Rendu ----------
+const cv = $('c'), out = cv.getContext('2d');
+const low = document.createElement('canvas'); low.width = FW; low.height = FH;
+let g = low.getContext('2d');
+let SCALE = 1, vx0 = 0, vx1 = FW, topIn = 0;
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight; if (!w || !h) return;          // vue masquée de taille nulle : on attend
+  const ratio = FW/FH;
+  let cw = w, chh = w/ratio; if (chh < h) { chh = h; cw = h*ratio; }
+  if (w/h > .75) { chh = h; cw = h*ratio; }
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.style.width = Math.round(cw) + 'px'; cv.style.height = Math.round(chh) + 'px';
+  cv.width = Math.max(1, Math.round(cw*dpr)); cv.height = Math.max(1, Math.round(chh*dpr));
+  SCALE = cv.width/FW;
+  const visW = Math.min(FW, FW*w/cw); vx0 = Math.ceil((FW - visW)/2); vx1 = FW - vx0;       // zone réellement visible (les bords sont rognés sur téléphone)
+  let st = 0; try { st = parseFloat(getComputedStyle($('safe')).paddingTop) || 0; } catch (e) {}
+  topIn = Math.ceil(st/(chh/FH));
+}
+window.addEventListener('resize', resize);
+function drawFrame(i, alpha, c) {
+  c = c || CH[ci]; const im = c.imgs[Math.floor(i/c.per)]; if (!im || !im.complete || !im.naturalWidth) return;
+  const l = i % c.per;
+  g.globalAlpha = alpha;
+  g.drawImage(im, (l % COLS)*FW, Math.floor(l/COLS)*FH, FW, FH, 0, 0, FW, FH);
+  g.globalAlpha = 1;
+}
+function txt(s, x, y, sc, col, align, alpha, noSh) {
+  s = norm(s); const w = tw(s, sc);
+  let x0 = Math.round(align === 'l' ? x : align === 'r' ? x - w : x - w/2); y = Math.round(y);
+  x0 = clamp(x0, vx0 + 2, Math.max(vx0 + 2, vx1 - 2 - w));
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  for (let pass = col === '#160d1c' || noSh ? 1 : 0; pass < 2; pass++) {
+    g.fillStyle = pass ? col : '#000'; const o = pass ? 0 : Math.max(.7, sc*.9), ox = o;
+    for (let i = 0; i < s.length; i++) { const gl = FONT[s[i]]; if (!gl) continue;
+      for (let r = 0; r < 7; r++) { const row = gl[r]; if (!row) continue; for (let c = 0; c < 5; c++) if (row & (16 >> c)) g.fillRect(x0 + ox + (i*6 + c)*sc, y + o + r*sc, sc, sc); } }
+  }
+  g.globalAlpha = 1;
+}
+function wrap(s, maxW, sc) { const out2 = []; let line = ''; for (const w of norm(s).split(' ')) { const t = line ? line + ' ' + w : w; if (tw(t, sc) > maxW && line) { out2.push(line); line = w; } else line = t; } if (line) out2.push(line); return out2; }
+function para(s, x, y, sc, col, lh) { const ls = wrap(s, vx1 - vx0 - 12, sc); ls.forEach((l, i) => txt(l, x, y + i*lh, sc, col)); return y + ls.length*lh; }
+const HEART = [54, 127, 127, 62, 28, 8];
+function heart(x, y, on) { g.fillStyle = '#000'; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) if (HEART[r] & (64 >> c)) g.fillRect(x + c + 1, y + r + 1, 1, 1);
+  g.fillStyle = on ? '#ff4d6d' : '#5a4a60'; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) if (HEART[r] & (64 >> c)) g.fillRect(x + c, y + r, 1, 1); if (on) { g.fillStyle = '#fff3e0'; g.fillRect(x + 1, y + 1, 1, 1); } }
+
+// ---------- État ----------
+const LIVES = 3, ROUND_T = 15;
+let phase = 'load', round = 1, time = ROUND_T, score = 0, hits = 0, ars = 0, kos = 0, lives = LIVES, hp = 1, maxHp = 1, hpShown = 1;
+let cur = null, queued = null, fade = null, clock = 0, stateT = 0, guardDur = 1, hitstop = 0, endT = 0, endTitle = '', isBest = false;
+let egoShake = 0, startCi = 0, roundClean = true, roundBonus = 0, timeFx = null, endReason = '', endStage = 'main', endMainT = 0, tipI = 0;
+let streak = 0, streakMax = 3, warn = 0, chain = 0, mult = 1, tut = -1, tutT = 0, tutMiss = 0, tour = 0, koCount = 0, koNeed = 1;
+let lastDir = 0, lastHitT = -9, shake = 0, flash = 0, flashC = '255,255,255', zoom = 0, banner = null;
+const floats = [], sparks = [], timers = [];
+const after = (s, fn) => timers.push({ t: s, fn });                        // minuteries du jeu : elles s'arrêtent avec la pause
+const diff = () => clamp((round - 1)*.16, 0, 1);
+
+// ---------- Progression : rangs (bonus permanents), missions, trophées ----------
+const RANK_XP = [0, 1500, 4000, 8000, 14000, 22000, 33000, 48000, 70000];
+const rankOf = v => { let r = 0; while (r + 1 < RANK_XP.length && v >= RANK_XP[r + 1]) r++; return r; };
+let maxLives = LIVES, timeBonus = 0, multEvery = 4, multMax = 5, critPts = 2, koMul = 1;
+function applyPerks() { const r = rankOf(xp); timeBonus = r >= 4 ? 2 : r >= 1 ? 1 : 0; multEvery = r >= 2 ? 3 : 4; maxLives = LIVES + (r >= 3 ? 1 : 0); koMul = r >= 5 ? 2 : 1; critPts = r >= 6 ? 3 : 2; multMax = r >= 7 ? 6 : 5; }
+const MK = { crit: [3, 5, 8, 12], ar: [3, 6, 10, 15], ko: [1, 2, 4, 6], pts: [800, 2000, 4000, 7000], mult: [3, 4, 5, 5], hits: [40, 80, 150, 250], reach: [1, 2, 2, 2], clean: [1, 1, 2, 3] };
+const REWARD = [250, 400, 600, 900];
+const tierOf = () => Math.min(3, Math.floor(rankOf(xp)/2));
+function newMission() {
+  const ks = Object.keys(MK).filter(k => !missions.some(m => m.k === k) && (k !== 'reach' || CH.length > 1));
+  const k = pick(ks), t = tierOf(); let n = MK[k][t]; if (k === 'reach') n = Math.min(n, CH.length - 1);
+  return { k, n, p: 0, t };
+}
+function fillMissions() { missions = missions.filter(m => MK[m.k]); while (missions.length < 3) missions.push(newMission()); }
+let endMissions = [], GS = null, gameXp = 0, xpFrom = 0, rankUp = -1, doneNow = [], toasts = [];
+const resetGS = () => { GS = { crit: 0, ar: 0, ko: 0, pts: 0, mult: 1, hits: 0, reach: 0, clean: 0, tour: 0 }; };
+const mProg = m => m.k === 'hits' ? (m.p || 0) + (GS ? GS.hits : 0) : GS ? GS[m.k] : 0;
+const mText = m => T.ms[m.k](m.n);
+function toast(a, b, c, r) { toasts.push({ a, b, c, r, t: 0 }); after(toasts.length > 1 ? .3*toasts.length : .05, () => { if (a === T.trophy) sfx.trophy(); else sfx.mission(); }); }
+function checkProgress() {
+  if (!GS || tut >= 0) return;
+  GS.pts = score; GS.ar = ars; GS.ko = kos; GS.hits = hits;
+  missions.forEach(m => { if (!m.done && mProg(m) >= m.n) { m.done = true; const r = REWARD[m.t !== undefined ? m.t : tierOf()]; gameXp += r; doneNow.push({ txt: mText(m), r }); toast(T.missionOk, mText(m), '#7ff0c0', '+' + r + ' XP'); } });
+  checkTrophies();
+}
+const TR = () => {
+  const l = [['k1', () => TOT.kos + kos >= 1]];
+  CH.forEach((c, k) => l.push(['c' + k, () => (TOT.ko[k] || 0) >= 1 || (GS && GS['ko' + k] > 0), k]));
+  l.push(['h100', () => TOT.hits + (GS ? GS.hits : 0) >= 100], ['h1k', () => TOT.hits + (GS ? GS.hits : 0) >= 1000], ['m5', () => GS && GS.mult >= 5], ['cr10', () => GS && GS.crit >= 10],
+    ['p5k', () => GS && GS.pts >= 5000], ['p10k', () => GS && GS.pts >= 10000], ['tour', () => GS && GS.tour > 0], ['r5', () => GS && round >= 5 && phase === 'play'], ['cl', () => GS && GS.clean > 0], ['leg', () => rankOf(xp) >= RANK_XP.length - 1]);
+  return l;
+};
+const trName = e => e[0][0] === 'c' && e[0] !== 'cl' && e[0] !== 'cr10' ? T.tr.c(e[2]) : T.tr[e[0]];
+function checkTrophies() { if (tut >= 0) return; TR().forEach(e => { if (!TROPH.includes(e[0]) && e[1]()) { TROPH.push(e[0]); toast(T.trophy, trName(e), '#ffd84a'); } }); }
+
+function frameOf(c) { const a = (c.ci !== undefined ? CH[c.ci].A : A)[c.key || c.name], n = Math.floor(c.t*c.fps); return a.loop ? a.f[n % a.f.length] : a.f[Math.min(a.f.length - 1, n)]; }
+function localOf(c) { return Math.floor(c.t*c.fps); }
+let lastTaunt = '', mockNext = false;
+function tauntKey(force) {                                   // plusieurs nargues : tirage au hasard, jamais deux fois la meme
+  if (force && A[force]) return force;
+  const ks = ['taunt', 'taunt2', 'taunt3'].filter(k => A[k] && k !== lastTaunt);
+  return ks.length ? pick(ks) : 'taunt';
+}
+function play(name, speed, force) {
+  if (cur) fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: .09 };
+  const key = name === 'taunt' ? tauntKey(force) : name;
+  if (name === 'taunt') lastTaunt = key;
+  if (name !== 'down' && name !== 'taunt') mockNext = false;
+  cur = { name, key, ci, t: 0, fps: A[key].fps*(speed || 1), hit: false, crit: false };
+  stateT = 0;
+  if (name === 'idle') cur.wait = rand(.5, 1.1) - diff()*.35;
+}
+function isBusy() { return ['block', 'recover', 'ko', 'enter'].includes(cur.name); }
+function panUp() {
+  const a = A[cur.key], l = localOf(cur);
+  if (cur.name === 'guard') return true;
+  if (cur.name === 'up') return l >= a.pan;
+  if (cur.name === 'down') return l < a.panUntil;
+  return false;
+}
+function critNow() { const c = A[cur.key].crit, l = localOf(cur); return !!c && l >= c[0] && l <= c[1]; }
+
+function slap(kind) {
+  if (phase !== 'play' || !cur || isBusy()) return;
+  if (cur.name === 'fore' || cur.name === 'back') { if (localOf(cur) < A[cur.name].free) { queued = kind; return; } }
+  sfx.whoosh();
+  if (panUp()) { play('block'); return; }
+  const crit = critNow();
+  const dir = kind === 'fore' ? -1 : 1;
+  const ar = lastDir === -dir && clock - lastHitT < .9;
+  const dmg = (ar ? 2 : 1)*(crit ? 2 : 1);
+  play(hp - dmg <= 0 && tut < 0 ? 'ko' : kind); cur.crit = crit; cur.ar = ar; cur.dir = dir;
+}
+function addFloat(s, x, y, c, sc, delay, huge, sg) { floats.push({ txt: s, x, y, t: -(delay || 0), c, sc, huge: !!huge, sg }); }
+function burst(x, y, dir, n, cols) { for (let i = 0; i < n; i++) { const a = rand(0, Math.PI*2), s = rand(30, 110); sparks.push({ x, y, vx: Math.cos(a)*s + dir*30, vy: Math.sin(a)*s - 30, t: 0, life: rand(.25, .5), c: pick(cols) }); } }
+function impact(c) {
+  const dir = c.dir, ar = c.ar, crit = c.crit;
+  const dmg = (ar ? 2 : 1)*(crit ? 2 : 1), pts = (ar ? 30 : 10)*(crit ? critPts : 1)*mult;
+  hp = Math.max(tut >= 0 ? 1 : 0, hp - dmg); score += pts; hits++; if (ar) ars++; streak++;
+  chain++; const m2 = Math.min(multMax, 1 + Math.floor(chain/multEvery)); let addT = crit ? 1 : 0; if (m2 > mult) { mult = m2; addT += 1; sfx.multUp(mult); addFloat('×' + mult, 90, 190, '#7ff0c0', 3, .1, false, 26); }
+  addT = Math.min(addT, 5 - roundBonus); if (addT > 0 && tut < 0) { time += addT; roundBonus += addT; timeFx = { n: addT, t: 0 }; sfx.timeBonus(); }   // plafond : +5 s par manche        // bonus de temps : +1 s par critique, +2 s par palier de multiplicateur
+  if (GS) { if (crit) GS.crit++; GS.mult = Math.max(GS.mult, mult); }
+  if (tut === 0 && dir < 0) tutStep(1); else if (tut === 1 && dir > 0) tutStep(2); else if (tut === 2 && ar) tutStep(3); else if (tut === 4) { if (crit || ++tutMiss >= 3) tutEnd(); }
+  lastDir = dir; lastHitT = clock;
+  shake = ar || crit ? 7 : 5; flash = 1; flashC = '255,255,255'; zoom = ar || crit ? 1 : .7;
+  hitstop = Math.max(hitstop, ar || crit ? .08 : .05); egoShake = 1;                 // court arrêt sur image : la gifle « pèse »
+  const x = dir < 0 ? 108 : 66, y = 118;
+  burst(x, y, dir, 14, ['#ffd84a', '#ffffff']);
+  const big = crit || ar;
+  addFloat(crit ? T.crit : ar ? T.ar : pick(T.pow), big ? 90 : x - dir*10, big ? 76 : y - 34, crit ? '#ff4d6d' : ar ? '#7ff0c0' : '#ffd84a', 1);
+  addFloat('+' + pts, 90, 156, '#fff3e0', 1, 0, false, big ? 11 : 8);
+  sfx.slap(dir < 0 ? 'fore' : 'back', ar);
+  if (crit) sfx.crit();
+  checkProgress();
+}
+function clang() {
+  if (tut < 0) { lives--; roundClean = false; } chain = 0; mult = 1; lastDir = 0; hitstop = .12; shake = 10; flash = 1; flashC = CH[ci].parry || '255,77,109'; zoom = 1;
+  burst(96, 120, 0, 22, ['#ffd84a', '#ffffff', '#ff4d6d']);
+  addFloat(CH[ci].clangTxt || T.clang, 90, 78, '#ffd84a', 2);
+  addFloat(T.ouch, 120, 200, '#ff4d6d', 1);
+  sfx.clang();
+  if (lives <= 0) { phase = 'over'; after(.9, () => finish('lives')); }
+}
+function knockout(c) {
+  impact(c);
+  hp = 0; kos++; const bonus = 100*round*koMul; score += bonus;
+  if (GS) { GS['ko' + ci] = (GS['ko' + ci] || 0) + 1; if (roundClean) GS.clean++; }
+  hitstop = .2; shake = 12; zoom = 1.4;
+  addFloat(T.ko, 90, 96, '#ff4d6d', 4, .15, true);
+  addFloat('+' + bonus, 90, 134, '#7ff0c0', 2, .15, false, 12);
+  koCount++; if (koCount >= koNeed && koNeed > 1) addFloat(charName() + T.out, 90, 160, '#ffd84a', 1, .5, true);
+  sfx.ko(); sfx.koBoom(); music.duck(1.5);
+  lives = Math.min(maxLives, lives + 1);
+  checkProgress();
+}
+function rollPatience() { const r = Math.random(); streakMax = Math.max(2, (r < .15 ? 2 : r < .4 ? 3 : r < .65 ? 4 : r < .85 ? 5 : 7) - Math.round(diff()*2)); streak = 0; }   // patience très variable : de 2 à 7 gifles
+function newRound(n) {
+  round = n; time = ROUND_T + timeBonus; roundClean = true; roundBonus = 0; maxHp = 8 + (n - 1)*4; hp = maxHp;
+  banner = { txt: T.round(n), sub: charName(), t: 0 };
+  rollPatience();
+}
+function retaliate() {
+  queued = null; rollPatience(); guardDur = rand(.6, 1.1) - diff()*.25;
+  play('up', 1 + diff()*.6); cur.t = (A.up.pan - 1)/cur.fps; warn = 1; sfx.panUp();
+}
+function tutStep(n) { tut = n; tutT = 0; tutMiss = 0; }
+function tutPan() { queued = null; guardDur = 1.7; play('up'); cur.t = A.up.pan/cur.fps; warn = 1; sfx.panUp(); }
+function tutEnd() { tut = -1; tutDone = true; save(); score = 0; hits = 0; ars = 0; hp = maxHp; time = ROUND_T + timeBonus; chain = 0; mult = 1; rollPatience(); banner = { txt: T.go, sub: T.fight, t: 0 }; }
+function nextBehavior() {
+  rollPatience();
+  const d = diff();
+  if (Math.random() < .35 + d*.3) { const feint = round >= 2 && Math.random() < .3 + d*.2; guardDur = feint ? rand(.08, .2) : rand(.7, 1.4) - d*.35; play('up', 1 + d*.6); warn = 1; sfx.panUp(); }
+  else { play('taunt', 1 + d*.5); if (Math.random() < .5) sfx.laugh(); }
+}
+function onEnd() {
+  const n = cur.name;
+  if (n === 'fore' && cur.crit && A.ouch && phase === 'play' && tut < 0) { play('ouch'); return; }   // apres un critique : il a mal
+  if (n === 'ouch') { play('idle'); return; }
+  if (n === 'fore' || n === 'back') { play('idle'); stateT = -rand(.15, .4); return; }
+  if (n === 'down' && mockNext) { mockNext = false; play('taunt', 1, 'taunt3'); sfx.laugh(); return; }   // il se moque apres une parade
+  if (n === 'taunt' || n === 'down') { if (tut === 4) tutEnd(); play('idle'); return; }
+  if (n === 'up') { play('guard'); return; }
+  if (n === 'block') { play('recover'); return; }
+  if (n === 'recover' && CH[ci].mock && phase === 'play' && tut < 0) { play('down'); mockNext = true; sfx.panDown(); return; }
+  if (n === 'recover') { if (phase === 'play' && tut !== 4 && !(tut === 3 && ++tutMiss >= 2)) { guardDur = .35; play('guard'); fade.dur = .22; } else { play('down'); if (tut >= 3) cur.t = (A.down.panUntil + 1)/cur.fps; } return; }
+  if (n === 'ko') {
+    if (phase === 'play') {                                              // perso suivant : fondu du décor vide de l'un vers l'entrée de l'autre
+      // un perso se bat en plusieurs K.O. : 1 au premier tour, 2 au deuxième, 3 ensuite ; entre deux K.O. il se relève
+      let k = ci, same = koCount < koNeed;
+      if (!same) { const nx = (ci + 1) % CH.length; if (ready(CH[nx])) { k = nx; if (nx === 0) tour++; } else tour++; koCount = 0; koNeed = Math.min(3, tour + 1); }
+      fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: k === ci ? .09 : .4 }; cur = null;
+      if (k !== ci) flash = .6, flashC = '255,255,255';
+      setChar(k); newRound(round + 1); if (same) banner.sub = T.up; play('enter');
+      if (GS && !same) { GS.seen = GS.seen || {}; GS.seen[k] = 1; GS.reach = Math.max(GS.reach, k); if (k === 0) GS.tour++; checkProgress(); }
+    }
+    return;
+  }
+  if (n === 'enter') { const soft = A.enter.soft; play('idle'); if (soft) fade.dur = .35; sfx.laugh3(); return; }
+}
+function start() {
+  sfx.unlock(); timeFx = null; zones = [];
+  applyPerks(); fillMissions(); missions.forEach(m => { m.done = false; if (m.t === undefined) m.t = tierOf(); }); resetGS(); gameXp = 0; doneNow = []; toasts.length = 0; rankUp = -1;
+  setChar(ready(CH[startCi]) ? startCi : 0); tour = 0; koCount = 0; koNeed = 1; phase = 'play'; score = 0; hits = 0; ars = 0; kos = 0; lives = maxLives; lastDir = 0; queued = null; floats.length = 0; sparks.length = 0; timers.length = 0;
+  newRound(1); hpShown = 1; chain = 0; mult = 1; play('idle'); stateT = -.6;
+  if (!tutDone) { tut = 0; tutT = 0; banner = null; }
+  after(.25, () => sfx.laugh(true));
+}
+function finish(reason) {
+  phase = 'end'; endT = 0; toasts.length = 0;
+  if (reason === 'time') play('taunt');
+  after(.3, () => sfx.laugh(true));
+  isBest = score > best; if (isBest) best = score;
+  if (GS && tut < 0) {
+    checkProgress();
+    TOT.hits += GS.hits; TOT.kos += kos; CH.forEach((c, k) => { TOT.ko[k] = (TOT.ko[k] || 0) + (GS['ko' + k] || 0); });
+    missions.forEach(m => { if (m.k === 'hits' && !m.done) m.p = (m.p || 0) + GS.hits; });
+    const r0 = rankOf(xp); xpFrom = xp; gameXp += score; xp += gameXp; rankUp = rankOf(xp) > r0 ? rankOf(xp) : -1;
+    endMissions = missions.map(m => ({ txt: mText(m), done: !!m.done, p: Math.min(m.n, m.k === 'hits' ? m.p || 0 : mProg(m)), n: m.n, r: REWARD[m.t !== undefined ? m.t : 0] }));
+    missions = missions.filter(m => !m.done).map(m => ({ k: m.k, n: m.n, p: m.p || 0, t: m.t })); fillMissions();
+    checkTrophies(); GS = null;
+  } else { xpFrom = xp; gameXp = 0; endMissions = []; }
+  save();
+  endTitle = reason === 'lives' ? T.endLives : T.endTime; endReason = reason; endStage = rankUp >= 0 ? 'rank' : 'main'; endMainT = 0; tipI++;
+  if (reason === 'lives') sfx.lose(); else sfx.timeUp(); if (rankUp >= 0) after(.8, () => sfx.rankUp());
+  if (YT) { try { YT.engagement.sendScore({ value: score }); } catch (e) {} }
+}
+
+// ---------- Geste ----------
+let ptr = null;
+function cycleStart() { startCi = (startCi + 1) % CH.length; if (!ready(CH[startCi])) startCi = 0; setChar(startCi); play('taunt'); }
+let zones = [];
+function tapUi(e) {
+  if (phase !== 'play') sfx.tap();
+  if (phase === 'troph') { phase = 'menu'; return; }
+  if (phase === 'menu') {
+    if (e && e.clientY !== undefined) { const r = cv.getBoundingClientRect(), y = (e.clientY - r.top)/r.height*FH*2/UIS; const z = zones.find(z => y >= z[0] && y <= z[1]); if (z) { z[2](); return; } }
+    start();
+  } else if (phase === 'end') {
+    if (endStage === 'rank') { if (endT > 1.2) { endStage = 'main'; endMainT = 0; } return; }
+    if (endMainT < 1.1) return;
+    if (e && e.clientY !== undefined) { const r = cv.getBoundingClientRect(), y = (e.clientY - r.top)/r.height*FH*2/UIS; const z = zones.find(z => y >= z[0] && y <= z[1]); if (z) { z[2](); return; } }
+    start();
+  }
+}
+function toMenu() { phase = 'menu'; floats.length = 0; play('taunt'); }
+cv.addEventListener('pointerdown', e => { sfx.unlock(); ptr = { x: e.clientX, used: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) {} });
+cv.addEventListener('pointermove', e => { if (!ptr || ptr.used || phase !== 'play') return; const dx = e.clientX - ptr.x; if (Math.abs(dx) > 22) { ptr.used = true; slap(dx < 0 ? 'fore' : 'back'); } });
+cv.addEventListener('pointerup', e => { if (ptr && !ptr.used) { if (phase === 'play') { const r = cv.getBoundingClientRect(); slap(e.clientX > r.left + r.width/2 ? 'fore' : 'back'); } else tapUi(e); } ptr = null; });
+cv.addEventListener('pointercancel', () => { ptr = null; });
+window.addEventListener('keydown', e => {
+  if (phase === 'play') { if (e.key === 'ArrowRight') slap('fore'); if (e.key === 'ArrowLeft') slap('back'); }
+  
+  else if (phase === 'menu' && (e.key === 't' || e.key === 'T')) phase = 'troph';
+  else if (e.key === 'Enter' || e.key === ' ') { sfx.unlock(); tapUi(); }
+});
+
+// ---------- Boucle ----------
+let readySent = false;
+function update(dt) {
+  clock += dt;
+  music.set(phase === 'play' || phase === 'over' ? 'game' : phase === 'menu' || phase === 'troph' ? 'menu' : null, phase === 'play' && tut < 0 && time <= 5 ? 1.12 : 1);
+  if (phase === 'load') {
+    if (ready(CH[0]) && dataReady) { phase = 'menu'; play('taunt'); for (let k = 1; k < CH.length; k++) loadChar(CH[k]); if (!readySent) { readySent = true; if (YT) { try { YT.game.gameReady(); } catch (e) {} } } }
+    return;
+  }
+  for (let i = timers.length - 1; i >= 0; i--) { timers[i].t -= dt; if (timers[i].t <= 0) { const f = timers[i].fn; timers.splice(i, 1); f(); } }
+  if (phase === 'end') { endT += dt; if (endStage === 'main') endMainT += dt; }
+  if (timeFx) { timeFx.t += dt; if (timeFx.t > 1.4) timeFx = null; }
+  hpShown += (clamp(hp/maxHp, 0, 1) - hpShown)*Math.min(1, dt*12);
+  shake *= Math.exp(-dt*14); flash = Math.max(0, flash - dt*6); zoom *= Math.exp(-dt*8);
+  for (let i = sparks.length - 1; i >= 0; i--) { const p = sparks[i]; p.t += dt; p.vy += 220*dt; p.x += p.vx*dt; p.y += p.vy*dt; if (p.t > p.life) sparks.splice(i, 1); }
+  for (let i = floats.length - 1; i >= 0; i--) { floats[i].t += dt; if (floats[i].t > (floats[i].huge ? 1.3 : .8)) floats.splice(i, 1); }
+  if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
+  if (toasts.length) { toasts[0].t += dt; if (toasts[0].t > 1.8) toasts.shift(); }
+  warn = Math.max(0, warn - dt*2.2); egoShake = Math.max(0, egoShake - dt*5);
+  if (hitstop > 0) { hitstop -= dt; return; }
+  if (fade) { fade.t += dt; if (fade.t > fade.dur) fade = null; }
+  if (!cur) return;
+  cur.t += dt; stateT += dt;
+  if (tut >= 0) { tutT += dt; if (tut === 3 && cur.name === 'down') tutStep(4); }
+  if (phase === 'play' && tut < 0 && !['ko', 'enter'].includes(cur.name)) {
+    const before = Math.ceil(time); time -= dt;
+    if (Math.ceil(time) < before && before <= 5 && time > 0) sfx.tick(before === 1);              // tic-tac des 5 dernières secondes
+    if (time <= 0) { time = 0; phase = 'over'; finish('time'); return; }
+  }
+  const a = A[cur.key], l = localOf(cur);
+  if (a.hit !== undefined && !cur.hit && l >= a.hit) {
+    cur.hit = true;
+    if (cur.name === 'block') clang(); else if (cur.name === 'ko') knockout(cur); else impact(cur);
+  }
+  if ((cur.name === 'fore' || cur.name === 'back') && l >= a.free && streak >= streakMax && phase === 'play' && tut < 0) { retaliate(); return; }
+  if (tut === 3 && (cur.name === 'fore' || cur.name === 'back') && l >= a.free) { tutPan(); return; }
+  if (tut === 4 && (cur.name === 'fore' || cur.name === 'back') && l >= a.free + 3) { queued = null; play('taunt'); return; }
+  if (queued && (cur.name === 'fore' || cur.name === 'back') && l >= a.free) { const q = queued; queued = null; play('idle'); slap(q); return; }
+  if (cur.name === 'idle') {
+    if (phase === 'play') { if (tut < 0) { if (stateT > cur.wait) nextBehavior(); } else if (tut === 4 && stateT > .5) play('taunt'); else if (tut === 3 && stateT > .3) tutPan(); }
+    else if (stateT > 1.2) play('taunt');                                 // menu et fin : il nargue en boucle
+    return;
+  }
+  if (cur.name === 'guard') { if (stateT > guardDur) { play('down', 1 + diff()*.4); sfx.panDown(); } return; }
+  if (!a.loop && l >= a.f.length) onEnd();
+}
+
+// ---------- Interface : reprise exacte de la maquette (board « Bonk - écrans », variante B) ----------
+// Repère de dessin = pixels de la maquette (écran de 360 de large). La zone visible est ramenée à 360 de large ;
+// sur un téléphone plus étroit, toute l'interface est réduite d'un même facteur, les proportions restent celles de la maquette.
+const C = { ink: '#160d1c', cream: '#fff3e0', yel: '#ffd84a', pink: '#ff4d6d', mint: '#7ff0c0', grey: '#a99bb5', plum: '#3a2a48', line: '#4a3a5a', off: '#5a4a60', dim: '#8a789a', box: '#6d5a78' };
+const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const nice = s => String(s).toLowerCase().replace(/(^|[\s'’-])\S/g, m => m.toUpperCase());
+let UIS = 1, KPX = 1;                                                           // réduction de l'interface, pixels écran par pixel maquette
+const HD = () => FH*2/UIS, TOPD = () => topIn*2/UIS, WD = 360, MID = 180;
+const toD = (x, y) => [(x - vx0)*2/UIS, y*2/UIS];                                // coordonnées du jeu (180 × 320) -> maquette
+const FNT = (f, size, w) => f === 'px' ? (w || 700) + ' ' + size + 'px PX, Silkscreen, monospace' : (w || 500) + ' ' + size + 'px SG, "Space Grotesk", system-ui, sans-serif';
+const LH = (f, size) => size*(f === 'px' ? 1.2 : 1.28);
+// texte façon CSS : y = haut de la ligne ; sh = ombres dures [dx, dy, couleur] (la première est au-dessus) ; glow = [dy, flou, couleur]
+function tx(s, x, y, o) {
+  const lh = o.lh || LH(o.f, o.size); g.save(); g.globalAlpha = o.a === undefined ? 1 : o.a;
+  const fb = o.f === 'px' && /\d/.test(s) ? o.size*.07 : 0;                          // chiffres : Silkscreen normal épaissi (le « 4 » du gras est illisible)
+  g.font = FNT(o.f, o.size, fb ? 400 : o.w); g.textBaseline = 'middle'; g.textAlign = o.al === 'l' ? 'left' : o.al === 'r' ? 'right' : 'center';
+  if (o.ls) { try { g.letterSpacing = o.ls + 'px'; } catch (e) {} }
+  const cy = y + lh/2 + (o.f === 'px' ? o.size*.04 : o.size*.02);
+  if (o.glow) { g.shadowColor = o.glow[2]; g.shadowBlur = o.glow[1]*KPX; g.shadowOffsetY = o.glow[0]*KPX; }
+  if (o.sh) for (let i = o.sh.length - 1; i >= 0; i--) { g.fillStyle = o.sh[i][2]; g.fillText(s, x + o.sh[i][0], cy + o.sh[i][1]); if (fb) g.fillText(s, x + o.sh[i][0] + fb, cy + o.sh[i][1]); }
+  g.fillStyle = o.col; g.fillText(s, x, cy); if (fb) g.fillText(s, x + fb, cy);
+  const w = g.measureText(s).width; g.restore(); return w;
+}
+function mw(s, f, size, w, ls) { g.save(); g.font = FNT(f, size, w); if (ls) { try { g.letterSpacing = ls + 'px'; } catch (e) {} } const r = g.measureText(s).width; g.restore(); return r; }
+function wrapT(s, maxW, f, size, w) { const out2 = []; let line = ''; for (const p of String(s).split(' ')) { const t = line ? line + ' ' + p : p; if (mw(t, f, size, w) > maxW && line) { out2.push(line); line = p; } else line = t; } if (line) out2.push(line); return out2; }
+function rr(x, y, w, h, r, fill, stroke, lw) {
+  g.beginPath(); r = Math.min(r, w/2, h/2);
+  g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); }
+}
+function bar(x, y, w, h, k, col) { rr(x, y, w, h, h/2, C.plum); if (k > 0) rr(x, y, Math.max(h, w*clamp(k, 0, 1)), h, h/2, col); }
+function panel(x, y, w, h, border) { rr(x + .5, y + .5, w - 1, h - 1, 10, 'rgba(22,13,28,.82)', border || C.line, 1); }
+function shadowBox(x, y, w, h, r, dy, blur, col) { g.save(); g.shadowColor = col; g.shadowBlur = blur*KPX; g.shadowOffsetY = dy*KPX; rr(x, y, w, h, r, '#000'); g.restore(); }
+function veil(a) { g.globalAlpha = a; g.fillStyle = C.ink; g.fillRect(-2, -2, WD + 4, HD() + 4); g.globalAlpha = 1; }
+function yellowBtn(label, y, w, h, size, z) {                                        // bouton jaune 260 × 56, ombre 0 4px 0 #c9a23a + 0 8px 18px
+  const x = MID - w/2; shadowBox(x, y + 4, w, h, 12, 8, 18, 'rgba(0,0,0,.4)'); rr(x, y + 4, w, h, 12, '#c9a23a'); rr(x, y, w, h, 12, C.yel);
+  tx(label, MID, y + (h - LH('px', size))/2, { f: 'px', size, col: C.ink });
+  if (z) zones.push([y - 4, y + h + 6, z]);
+}
+function textBtn(label, y, z) { tx(label, MID, y + (44 - LH('sg', 14))/2, { f: 'sg', size: 14, w: 500, col: C.grey }); if (z) zones.push([y, y + 44, z]); }
+function pheart(x, y, on, k) {
+  g.fillStyle = '#000'; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) if (HEART[r] & (64 >> c)) g.fillRect(x + c*k + 1, y + r*k + 1, k, k);
+  g.fillStyle = on ? C.pink : C.off; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) if (HEART[r] & (64 >> c)) g.fillRect(x + c*k, y + r*k, k + .05, k + .05);
+  if (on) { g.fillStyle = C.cream; g.fillRect(x + k, y + k, k, k); }
+}
+function rich(segs, x, y, size, maxW, lh, draw) {                                   // texte multicolore (spans de la maquette), renvoie la hauteur
+  const words = []; segs.forEach(([s, c, w]) => s.split(/(?= )/).forEach(p => words.push([p, c, w || 500])));
+  let cx = 0, cy = 0; const pl = [];
+  words.forEach(([p, c, w]) => { let ww = mw(p, 'sg', size, w); if (cx + ww > maxW && cx > 0) { cx = 0; cy += lh; p = p.replace(/^ /, ''); ww = mw(p, 'sg', size, w); } pl.push([p, cx, cy, c, w]); cx += ww; });
+  if (draw !== false) pl.forEach(([p, px, py, c, w]) => tx(p, x + px, y + py, { f: 'sg', size, w, col: c, al: 'l', lh }));
+  return cy + lh;
+}
+
+// ----- En jeu (3B) -----
+function chrono(cx, cy) {                                                           // cercle 50 px, bord 3 px, camembert qui se vide, chiffre Silkscreen 17 px
+  const k = clamp(time/(ROUND_T + timeBonus), 0, 1), red = time <= 5, pop = timeFx && timeFx.t < .25 ? 1 + (1 - timeFx.t/.25)*.12 : 1;
+  g.save(); g.translate(cx, cy); g.scale(pop, pop);
+  g.save(); g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = 10*KPX; g.shadowOffsetY = 3*KPX; g.beginPath(); g.arc(0, 0, 25, 0, Math.PI*2); g.fillStyle = C.ink; g.fill(); g.restore();
+  g.beginPath(); g.arc(0, 0, 22, 0, Math.PI*2); g.fillStyle = 'rgba(58,42,72,.95)'; g.fill();
+  if (k > 0) { g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, 22, -Math.PI/2, -Math.PI/2 + Math.PI*2*k); g.closePath(); g.fillStyle = red ? C.pink : C.yel; g.fill(); }
+  g.beginPath(); g.arc(0, 0, 16, 0, Math.PI*2); g.fillStyle = C.ink; g.fill();
+  tx(String(Math.ceil(time)), 0, -LH('px', 17)/2, { f: 'px', size: 17, col: red && Math.floor(clock*4) % 2 ? C.pink : C.cream });
+  g.restore();
+}
+function hud() {
+  const T0 = TOPD(), x0 = 12, x1 = WD - 12, rowY = T0 + 12, rowH = 50;
+  // gauche : score (Silkscreen 26, ombre 3 px) + ×3 (Space Grotesk 20 bold), puis la manche (12 px)
+  const sw = tx(fmt(score), x0, rowY + 3, { f: 'px', size: 26, lh: 26, col: C.yel, al: 'l', sh: [[3, 3, '#000']] });
+  if (mult > 1) tx('×' + mult, x0 + sw + 6, rowY + 4, { f: 'sg', size: 20, w: 700, col: C.mint, al: 'l', sh: [[0, 2, '#000']] });
+  tx(T.roundKo(round, koCount, koNeed), x0, rowY + 31, { f: 'sg', size: 12, w: 500, col: C.cream, al: 'l', glow: [1, 3, '#000'] });
+  // droite : chrono 50 px ; à sa gauche (gap 10) les cœurs 21 × 18 (gap 5) avec « +1 s » au-dessus
+  chrono(x1 - 25, rowY + rowH/2);
+  const hr = x1 - 50 - 10, hw = 21, hg = 5, n = maxLives, hx0 = hr - n*hw - (n - 1)*hg;
+  for (let i = 0; i < n; i++) pheart(hx0 + i*(hw + hg), rowY + 25, i < lives, 3);
+  if (timeFx && timeFx.t < 1.3) { const a2 = 1 - ease(clamp((timeFx.t - .9)/.4, 0, 1)); tx('+' + timeFx.n + ' s', hr, rowY + 4 - ease(clamp(timeFx.t/.3, 0, 1))*3, { f: 'sg', size: 14, w: 700, col: C.mint, al: 'r', a: a2, glow: [1, 3, '#000'] }); }
+  // barre d'ego : 18 px, arrondi 9, bord 1 px crème 70 %
+  const by = rowY + rowH + 8 + (egoShake > 0 ? rand(-3, 3)*egoShake : 0), bw = x1 - x0;
+  rr(x0 + .5, by + .5, bw - 1, 17, 9, 'rgba(22,13,28,.85)', 'rgba(255,243,224,.7)', 1);
+  if (hpShown > 0) { g.save(); rr(x0 + 1, by + 1, bw - 2, 16, 8); g.clip(); g.fillStyle = C.pink; g.fillRect(x0, by, bw*hpShown, 18); g.restore(); }
+  tx(T.ego, x0 + 8, by + 1, { f: 'sg', size: 12, w: 700, col: C.cream, al: 'l', ls: 1, lh: 16 });
+  if (phase === 'play' && cur && !isBusy() && critNow() && Math.floor(clock*10) % 2 === 0) { g.strokeStyle = C.yel; g.lineWidth = 4; g.strokeRect(2, 2, WD - 4, HD() - 4); }   // cadre jaune 4 px : moment du critique
+  if (tut >= 0) tutoUI();
+  if (warn > 0) { const k = 1 - warn; tx('!', MID, by + 26, { f: 'px', size: k < .15 ? 70 : 56, col: C.pink, a: clamp(warn*2.5, 0, 1), sh: [[3, 3, '#000']] }); }
+}
+// main pixel de la maquette (svg 16 × 18, 64 × 72 px)
+const HANDP = 'M6 0h2v8h1V4h2v5h1V5h2v6h1V7h1v6l-1 3H5l-3-5 1-1 3 2z';
+function handIcon(x, y, flip) { g.save(); g.translate(x + (flip ? 64 : 0), y); g.scale(flip ? -4 : 4, 4); const p = new Path2D(HANDP);
+  g.save(); g.translate(.75, .75); g.fillStyle = '#000'; g.fill(p); g.restore(); g.fillStyle = C.cream; g.fill(p); g.restore(); }
+function tutoUI() {
+  const a2 = ease(clamp(tutT/.25, 0, 1)), H = HD();
+  g.globalAlpha = a2;
+  if (tut < 2) {                                                                    // zone à toucher : moitié surlignée (jaune 16 %, pointillés), l'autre assombrie (45 %)
+    const right = tut === 0, hx = right ? MID : 0;
+    g.fillStyle = 'rgba(255,216,74,.16)'; g.fillRect(hx, 0, MID, H);
+    g.fillStyle = 'rgba(22,13,28,.45)'; g.fillRect(right ? 0 : MID, 0, MID, H);
+    g.fillStyle = C.yel; for (let yy = 0; yy < H; yy += 10) g.fillRect(MID - 1, yy, 2, 5);
+    const bx = (right ? MID + 30 : 30) + 28, bob = Math.sin(clock*6)*3;          // bloc main : left 30, top 300, largeur 120
+    handIcon(bx, 300 + bob, right);
+    const dx = ease((clock*1.4) % 1)*14*(right ? -1 : 1);
+    tx(right ? '<' : '>', bx + 32 + dx, 378, { f: 'px', size: 40, col: C.yel, sh: [[3, 3, '#000']] });
+  }
+  // carte du bas : marges 16, bas 20, padding 18 20 20, rayon 14 ; points de progression en tête
+  const W = WD - 32, red = tut === 3;
+  const tl = wrapT(T.tutT[tut], W - 40, 'px', 24, 700), sl = wrapT(T.tutS[tut], W - 40, 'sg', 15, 500);
+  const h = 18 + 6 + 6 + LH('sg', 12) + 6 + tl.length*LH('px', 24) + 6 + sl.length*LH('sg', 15) + 20, y = H - 20 - h;
+  rr(16, y, W, h, 14, 'rgba(22,13,28,.9)');
+  let yy = y + 18;
+  for (let i = 0; i < 5; i++) rr(MID - (5*28 + 4*6)/2 + i*34, yy, 28, 6, 3, i <= tut ? C.yel : 'rgba(255,243,224,.3)');
+  yy += 12; tx(T.step(tut + 1, 5), MID, yy, { f: 'sg', size: 12, w: 500, col: C.grey, ls: 1.2 }); yy += LH('sg', 12) + 6;
+  tl.forEach(l => { tx(l, MID, yy, { f: 'px', size: 24, col: red ? C.pink : C.yel }); yy += LH('px', 24); }); yy += 6;
+  sl.forEach(l => { tx(l, MID, yy, { f: 'sg', size: 15, w: 500, col: C.cream }); yy += LH('sg', 15); });
+  g.globalAlpha = 1;
+}
+function toastUI() {                                                                // bandeau 6B : marges 16, padding 10 14, rayon 12, bord 1 px
+  const t0 = toasts[0], a2 = ease(clamp(t0.t/.2, 0, 1))*(1 - ease(clamp((t0.t - 1.5)/.3, 0, 1))), x = 16, w = WD - 32, h = 54;
+  const y = TOPD() + 100 - (1 - a2)*10;
+  g.globalAlpha = a2; rr(x + .5, y + .5, w - 1, h - 1, 12, 'rgba(22,13,28,.9)', t0.c, 1);
+  rr(x + 14, y + 13, 28, 28, 8, t0.c); g.strokeStyle = C.ink; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(x + 14 + 9, y + 13 + 14.5); g.lineTo(x + 14 + 12, y + 13 + 17.5); g.lineTo(x + 14 + 19, y + 13 + 10.5); g.stroke();
+  tx(t0.a, x + 54, y + 10, { f: 'sg', size: 12, w: 700, col: t0.c, al: 'l', ls: 1, a: a2 });
+  const tw1 = tx(t0.b + (t0.r ? ' ' : ''), x + 54, y + 26, { f: 'sg', size: 14, w: 500, col: C.cream, al: 'l', a: a2 });
+  if (t0.r) tx(t0.r, x + 54 + tw1, y + 26, { f: 'sg', size: 14, w: 700, col: t0.c, al: 'l', a: a2 });
+  g.globalAlpha = 1;
+}
+function bannerUI() {
+  const inn = ease(clamp(banner.t/.25, 0, 1)), a2 = 1 - ease(clamp((banner.t - 1.2)/.4, 0, 1)), y = 392;
+  g.globalAlpha = .78*a2; g.fillStyle = C.ink; g.fillRect(-2, y, WD + 4, 84*inn); g.globalAlpha = 1;
+  tx(banner.txt, MID, y + 12, { f: 'px', size: 30, col: C.yel, a: a2, sh: [[3, 3, '#000']] });
+  if (banner.t > .45) tx(nice(banner.sub), MID, y + 52, { f: 'sg', size: 15, w: 700, col: C.pink, a: a2 });
+}
+
+// ----- Menu (1B) -----
+function rankCard(y, v) {                                                            // 300 de large, padding 14 16, gap 8, rayon 10
+  const x = 30, w = 300, r = rankOf(v), lo = RANK_XP[r], hi = RANK_XP[r + 1], h = 14 + 22 + 8 + 8 + 8 + 15.4 + 14;
+  panel(x, y, w, h);
+  tx(T.rankN(r), x + 16, y + 14 + 4, { f: 'sg', size: 12, w: 500, col: C.grey, al: 'l', ls: 1 });
+  tx(T.ranks[r], x + w - 16, y + 14, { f: 'px', size: 18, col: C.yel, al: 'r' });
+  bar(x + 16, y + 44, w - 32, 8, hi ? (v - lo)/(hi - lo) : 1, C.mint);
+  tx(hi ? T.xpOf(v, hi) : T.maxRank, x + 16, y + 60, { f: 'sg', size: 12, w: 400, col: C.grey, al: 'l' });
+  if (hi && T.perkS[r + 1]) tx(T.nextP(T.perkS[r + 1]), x + w - 16, y + 60, { f: 'sg', size: 12, w: 500, col: C.mint, al: 'r' });
+  return y + h;
+}
+function mRow(x, y, w, s, right, done, rcol, pad) {                                 // case 12 px, texte 14 px, progression 13 px à droite
+  const p = pad || 16, rs = done ? 14 : 13, lines = wrapT(s, w - 2*p - 22 - mw(right, 'sg', rs, done ? 700 : 500) - 8, 'sg', 14, 500), lh = LH('sg', 14);
+  if (done) rr(x + p, y + (lh - 12)/2, 12, 12, 3, C.mint); else rr(x + p + 1, y + (lh - 12)/2 + 1, 10, 10, 2.5, null, C.box, 2);
+  lines.forEach((l, i) => tx(l, x + p + 22, y + i*lh, { f: 'sg', size: 14, w: 500, col: done ? C.mint : C.cream, al: 'l' }));
+  tx(right, x + w - p, y, { f: 'sg', size: rs, w: done ? 700 : 500, col: rcol || (done ? C.mint : C.grey), al: 'r', lh });
+  return y + lines.length*lh;
+}
+function missionCard(y) {                                                            // padding 14 16, gap 10
+  fillMissions(); const x = 30, w = 300;
+  const rows = missions.map(m => [mText(m), (m.k === 'hits' ? m.p || 0 : 0) + '/' + m.n]);
+  let h = 14 + LH('px', 14); rows.forEach(r => { h += 10 + wrapT(r[0], w - 32 - 22 - mw(r[1], 'sg', 13, 500) - 8, 'sg', 14, 500).length*LH('sg', 14); }); h += 10 + LH('sg', 12) + 14;
+  panel(x, y, w, h); tx(T.missions, x + 16, y + 14, { f: 'px', size: 14, col: C.pink, al: 'l' });
+  let yy = y + 14 + LH('px', 14); rows.forEach(r => { yy = mRow(x, yy + 10, w, r[0], r[1], false); });
+  tx(T.perMission(REWARD[tierOf()]), x + 16, yy + 10, { f: 'sg', size: 12, w: 400, col: C.mint, al: 'l' });
+  return y + h;
+}
+function logo(y) { const o = { f: 'px', size: 60, lh: 60, col: C.yel, sh: [[4, 4, C.pink], [6, 6, '#000']] }; tx('SLAP', MID, y, o); tx('EGO!', MID, y + 58, o); return 118; }
+function menuUI() {
+  zones = []; const H = HD();
+  veil(.62);
+  let y = TOPD() + 40;
+  y += logo(y) + 12;
+  wrapT(T.sub2, 280, 'sg', 15, 500).forEach(l => { tx(l, MID, y, { f: 'sg', size: 15, w: 500, col: C.cream, lh: 20, glow: [2, 6, 'rgba(0,0,0,.6)'] }); y += 20; }); y += 14;
+  y = rankCard(y, xp) + 14;
+  y = missionCard(y);
+  const rowY = Math.max(y + 14 + 56 + 14, H - 28 - 44), btnY = rowY - 14 - 56;
+  yellowBtn(T.play, btnY, 260, 56, 22, start);
+  rr(50 + .5, rowY + .5, 124, 43, 10, 'rgba(58,42,72,.9)', C.yel, 1);
+  tx(T.trophBtn(TROPH.length, TR().length), 50 + 62.5, rowY + (44 - LH('sg', 14))/2, { f: 'sg', size: 14, w: 700, col: C.yel }); zones.push([rowY, rowY + 44, () => { phase = 'troph'; }]);
+  const rx = 50 + 125 + 10 + 62.5; tx(T.record, rx, rowY + 3.5, { f: 'sg', size: 11, w: 500, col: C.mint, ls: .9 }); tx(fmt(best), rx, rowY + 3.5 + LH('sg', 11), { f: 'sg', size: 18, w: 700, col: C.cream });
+     // sélecteur de test : aperçu seulement, absent du build YouTube
+}
+// ----- Trophées (7B) -----
+function trophUI() {
+  zones = []; veil(.86); const H = HD();
+  let y = TOPD() + 32;
+  tx(T.trophies, MID, y, { f: 'px', size: 30, col: C.yel, sh: [[3, 3, '#000']] }); y += LH('px', 30) + 12;
+  tx(T.trophCount(TROPH.length, TR().length), MID, y, { f: 'sg', size: 14, w: 700, col: C.mint }); y += LH('sg', 14) + 12;
+  const W = 328, x = 16, cw = (W - 6)/2;
+  TR().forEach((e, i) => { const on = TROPH.includes(e[0]), cx = x + (i % 2)*(cw + 6), cy = y + Math.floor(i/2)*46;
+    rr(cx + .5, cy + .5, cw - 1, 39, 8, on ? 'rgba(58,42,72,.95)' : 'rgba(22,13,28,.9)', on ? C.yel : C.plum, 1);
+    rr(cx + 10, cy + 13, 14, 14, 4, on ? C.yel : C.plum);
+    const ls = wrapT(trName(e), cw - 42, 'sg', 12, 500).slice(0, 2); ls.forEach((l, j) => tx(l, cx + 32, cy + 20 - ls.length*7 + j*14, { f: 'sg', size: 12, w: 500, col: on ? C.cream : C.dim, al: 'l', lh: 14 })); });
+  const by = H - 20 - 48;
+  rr(MID - 100 + .5, by + .5, 199, 47, 12, 'rgba(58,42,72,.9)', C.yel, 1); tx(T.backB, MID, by + (48 - LH('sg', 15))/2, { f: 'sg', size: 15, w: 700, col: C.yel });
+}
+// ----- Nouveau rang (6B) -----
+function rankUpUI(a2) {
+  const r = rankUp, nl = wrapT(T.ranks[r], 268, 'px', 24, 700), tl = wrapT(T.newRank, 268, 'px', 26, 700);
+  const h = 24 + tl.length*LH('px', 26) + 10 + 72 + 10 + nl.length*LH('px', 24) + 10 + LH('sg', 13) + 10 + LH('sg', 18) + 24, x = 30, w = 300, y = Math.max(TOPD() + 60, (HD() - h)/2 - 20);
+  g.globalAlpha = a2;
+  shadowBox(x, y, w, h, 16, 10, 30, 'rgba(0,0,0,.5)'); rr(x + 1, y + 1, w - 2, h - 2, 16, 'rgba(22,13,28,.92)', C.yel, 2);
+  let yy = y + 24; tl.forEach(l => { tx(l, MID, yy, { f: 'px', size: 26, col: C.yel, sh: [[3, 3, C.pink]] }); yy += LH('px', 26); });
+  yy += 10; rr(MID - 36, yy, 72, 72, 16, C.yel); tx(String(r + 1), MID, yy + (72 - LH('px', 40))/2, { f: 'px', size: 40, col: C.ink }); yy += 72 + 10;
+  nl.forEach(l => { tx(l, MID, yy, { f: 'px', size: 24, col: C.cream }); yy += LH('px', 24); }); yy += 10;
+  tx(T.unlocked, MID, yy, { f: 'sg', size: 13, w: 400, col: C.grey }); yy += LH('sg', 13) + 10;
+  if (T.perkS[r]) tx('+ ' + T.perkS[r].charAt(0).toLowerCase() + T.perkS[r].slice(1), MID, yy, { f: 'sg', size: 18, w: 700, col: C.mint });
+  if (endT > 1.2 && Math.floor(clock*2) % 2 === 0) tx(T.cont, MID, HD() - 30 - LH('sg', 14), { f: 'sg', size: 14, w: 500, col: C.mint });
+  g.globalAlpha = 1;
+}
+// ----- Fin du chrono (4B) et défaite (5B) -----
+function endUI() {
+  zones = [];
+  const a2 = ease(clamp((endT - .35)/.4, 0, 1)), lost = endReason === 'lives', H = HD();
+  veil((lost ? .66 : .7)*a2);
+  if (a2 < .5) return;
+  if (endStage === 'rank') { rankUpUI(a2); return; }
+  const x = 30, W = 300, k = ease(clamp((endMainT - .3)/1.1, 0, 1)), gap = 10;
+  let y = TOPD() + (lost ? 40 : 36);
+  if (lost) {
+    tx(T.handGave, MID, y, { f: 'sg', size: 15, w: 500, col: C.pink }); y += LH('sg', 15) + gap;
+    tx(T.almost, MID, y, { f: 'px', size: 30, lh: 33, col: C.yel, sh: [[3, 3, '#000']] }); y += 33 + gap;
+    tx(fmt(score), MID, y, { f: 'px', size: 44, lh: 44, col: C.cream, sh: [[3, 3, '#000']] }); y += 44 + gap;
+    if (isBest && score > 0) tx(T.newRec, MID, y, { f: 'sg', size: 14, w: 700, col: C.mint, ls: 1.1 }); else tx(T.recordIs(best), MID, y, { f: 'sg', size: 13, w: 400, col: C.grey });
+    y += LH('sg', 13) + gap;
+    // carte XP (bord menthe) : « +930 XP quand même », barre, reste avant le prochain rang
+    const shown = Math.round(xpFrom + gameXp*k), r = rankOf(shown), lo = RANK_XP[r], hi = RANK_XP[r + 1];
+    const rf = rankOf(xp), nh = RANK_XP[rf + 1], segs = nh ? T.xpLeft(fmt(nh - xp), T.ranks[rf + 1], T.perkS[rf + 1] || '') : [[T.top, C.cream]];
+    const th = rich(segs, 0, 0, 13, W - 32, 18, false), h = 12 + LH('sg', 16) + 8 + 8 + 8 + th + 12;
+    panel(x, y, W, h, C.mint);
+    tx(T.xpAnyway(fmt(gameXp*k)), x + 16, y + 12, { f: 'sg', size: 16, w: 700, col: C.mint, al: 'l' });
+    bar(x + 16, y + 12 + LH('sg', 16) + 8, W - 32, 8, hi ? (shown - lo)/(hi - lo) : 1, C.mint);
+    rich(segs, x + 16, y + 12 + LH('sg', 16) + 24, 13, W - 32, 18); y += h + gap;
+    const near = endMissions.filter(m => !m.done).sort((a, b) => b.p/b.n - a.p/a.n)[0];
+    if (near) { const mh = 12 + LH('sg', 11) + 8 + LH('sg', 14) + 8 + 6 + 12; panel(x, y, W, mh);
+      tx(T.closest, x + 16, y + 12, { f: 'sg', size: 11, w: 700, col: C.pink, al: 'l', ls: 1.1 });
+      tx(near.txt, x + 16, y + 12 + LH('sg', 11) + 8, { f: 'sg', size: 14, w: 500, col: C.cream, al: 'l' }); tx(near.p + '/' + near.n, x + W - 16, y + 12 + LH('sg', 11) + 8, { f: 'sg', size: 14, w: 700, col: C.yel, al: 'r' });
+      bar(x + 16, y + mh - 12 - 6, W - 32, 6, near.p/near.n, C.yel); y += mh + gap; }
+    const tipS = [[T.tip + ' ', C.yel, 700], [T.tips[tipI % T.tips.length], C.cream]], tph = rich(tipS, 0, 0, 13, W - 32, 18, false) + 24;
+    rr(x, y, W, tph, 10, 'rgba(58,42,72,.9)'); rich(tipS, x + 16, y + 12, 13, W - 32, 18); y += tph + gap;
+  } else {
+    wrapT(T.timeUp, 320, 'px', 24, 700).forEach(l => { tx(l, MID, y, { f: 'px', size: 24, col: C.pink, sh: [[3, 3, '#000']] }); y += LH('px', 24); }); y += gap;
+    tx(T.heldOn(nice(charName())), MID, y, { f: 'sg', size: 15, w: 500, col: C.cream }); y += LH('sg', 15) + gap;
+    tx(fmt(score), MID, y, { f: 'px', size: 56, lh: 56, col: C.yel, sh: [[4, 4, '#000']] }); y += 56 + gap;
+    if (isBest && score > 0) tx(T.newRec, MID, y, { f: 'sg', size: 14, w: 700, col: C.mint, ls: 1.1 }); else tx(T.recordIs(best), MID, y, { f: 'sg', size: 13, w: 400, col: C.grey });
+    y += LH('sg', 14) + gap;
+    const cw = (W - 12)/3, sh = 8 + LH('sg', 22) + LH('sg', 11) + 8;                // 3 cases de stats, gap 6
+    [hits, ars, kos].forEach((v, i) => { const cx = x + i*(cw + 6); rr(cx + .5, y + .5, cw - 1, sh - 1, 10, 'rgba(22,13,28,.85)', C.line, 1);
+      tx(String(v), cx + cw/2, y + 8, { f: 'sg', size: 22, w: 700, col: C.cream }); tx(T.statLbl[i], cx + cw/2, y + 8 + LH('sg', 22), { f: 'sg', size: 11, w: 400, col: C.grey }); });
+    y += sh + gap;
+    if (gameXp > 0) {                                                               // carte XP : +XP, rang, barre, compteur
+      const shown = Math.round(xpFrom + gameXp*k), r = rankOf(shown), lo = RANK_XP[r], hi = RANK_XP[r + 1], h = 12 + LH('sg', 18) + 8 + 8 + 8 + LH('sg', 12) + 12;
+      panel(x, y, W, h);
+      tx('+' + fmt(gameXp*k) + ' XP', x + 16, y + 12, { f: 'sg', size: 18, w: 700, col: C.mint, al: 'l' }); tx(T.ranks[r], x + W - 16, y + 12 + 4, { f: 'px', size: 14, col: C.yel, al: 'r' });
+      bar(x + 16, y + 12 + LH('sg', 18) + 8, W - 32, 8, hi ? (shown - lo)/(hi - lo) : 1, C.mint);
+      tx(hi ? T.xpOf(shown, hi) : T.maxRank, x + 16, y + 12 + LH('sg', 18) + 24, { f: 'sg', size: 12, w: 400, col: C.grey, al: 'l' }); y += h + gap;
+    }
+    if (endMissions.length) {
+      let h = 24; endMissions.forEach((m, i) => { h += (i ? 8 : 0) + wrapT(m.txt, W - 32 - 22 - mw(m.done ? '+' + m.r : m.p + '/' + m.n, 'sg', 14, 700) - 8, 'sg', 14, 500).length*LH('sg', 14); });
+      panel(x, y, W, h); let yy = y + 12; endMissions.forEach((m, i) => { yy = mRow(x, yy + (i ? 8 : 0), W, m.txt, m.done ? '+' + m.r : m.p + '/' + m.n, m.done); }); y += h + gap;
+    }
+  }
+  if (endMainT > 1.1) {                                                             // bas : bouton 260 × 56 puis « Menu » 44 px, marge 24
+    const menuY = Math.max(y + 56 + gap, H - 24 - 44), btnY = menuY - gap - 56;
+    yellowBtn(lost ? T.revenge : T.replay, btnY, 260, 56, lost ? 22 : 20, start);
+    textBtn(T.menuB, menuY, toMenu);
+  }
+}
+function drawUI() {
+  const vwU = vx1 - vx0; UIS = vwU/180; KPX = SCALE*UIS/2;
+  for (const f of floats) {
+    if (f.t < 0) continue;
+    const life = f.huge ? 1.3 : .8, kk = f.t/life, a2 = 1 - ease((kk - .6)/.4), [fx, fy] = toD(f.x, f.y - ease(kk)*16), pop = f.t < .07 ? 1.25 : 1;
+    if (f.sg) tx(f.txt, fx, fy - f.sg, { f: 'sg', size: f.sg*2*pop, w: 700, col: f.c, a: a2, sh: [[0, f.sg > 15 ? 3 : 2, '#000']] });
+    else { const size = (f.sc === 1 ? 30 : f.sc*14)*pop; tx(f.txt, fx, fy - size*.6, { f: 'px', size, col: f.c, a: a2, sh: [[3, 3, '#000']] }); }
+  }
+  if (phase === 'play' || phase === 'over') hud();
+  if (toasts.length && (phase === 'play' || phase === 'over')) toastUI();
+  if (banner && phase === 'play') bannerUI();
+  if (phase === 'load') {
+    logo(HD()/2 - 140); const bw = 180, x = MID - 90, y = HD()/2 + 10, k = CH[0].loaded/CH[0].n;
+    bar(x, y, bw, 10, Math.max(.04, k), C.yel); tx(T.load, MID, y + 22, { f: 'sg', size: 14, w: 500, col: C.cream });
+  }
+  if (phase === 'menu') menuUI();
+  if (phase === 'troph') trophUI();
+  if (phase === 'end') endUI();
+}
+function render() {
+  if (!cv.width || !cv.height) return;
+  g.save();
+  g.fillStyle = C.ink; g.fillRect(0, 0, FW, FH);
+  const z = 1 + zoom*.05;
+  g.translate(FW/2 + Math.round(rand(-shake, shake)), FH/2 + Math.round(rand(-shake, shake))); g.scale(z, z); g.translate(-FW/2, -FH/2);
+  if (cur) drawFrame(frameOf(cur), 1, CH[cur.ci !== undefined ? cur.ci : ci]);
+  if (fade) drawFrame(fade.frame, 1 - ease(fade.t/fade.dur), CH[fade.ci]);
+  g.restore();
+  for (const p of sparks) { g.fillStyle = p.c; g.globalAlpha = 1 - p.t/p.life; g.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); }
+  g.globalAlpha = 1;
+  out.imageSmoothingEnabled = false;
+  out.drawImage(low, 0, 0, cv.width, cv.height);
+  out.save(); out.globalCompositeOperation = 'screen'; out.globalAlpha = .1; out.imageSmoothingEnabled = true; out.drawImage(low, 0, 0, cv.width, cv.height); out.restore();
+  const gl = g; g = out; const u = (vx1 - vx0)/180*SCALE/2;                        // interface en haute définition, repère = pixels de la maquette
+  out.save(); out.setTransform(u, 0, 0, u, vx0*SCALE, 0);
+  try { drawUI(); } finally { out.restore(); g = gl; }
+  if (flash > .02) { out.fillStyle = `rgba(${flashC},${flash*.3})`; out.fillRect(0, 0, cv.width, cv.height); }
+  out.fillStyle = 'rgba(0,0,0,.13)'; const st = Math.max(2, Math.round(SCALE)); for (let y = 0; y < cv.height; y += st) out.fillRect(0, y, cv.width, Math.max(1, Math.floor(st/3)));
+  const vg = out.createRadialGradient(cv.width/2, cv.height*.45, cv.height*.3, cv.width/2, cv.height*.45, cv.height*.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)'); out.fillStyle = vg; out.fillRect(0, 0, cv.width, cv.height);
+}
+
+// ---------- Son : extraits des vidéos, fichiers du bundle ; suit le réglage audio de YouTube ----------
+const SNAMES = ['fore1', 'fore2', 'back1', 'laugh', 'clang', 'koslap', 'panup', 'pandown', 'laugh2', 'laugh3'];
+const SOUNDS = []; CH.forEach(c => SNAMES.forEach(k => SOUNDS.push(c.sp + k)));
+let audioOn = true, paused = false;
+const sfx = (() => {
+  let ac = null, nb = null, master = null; const buf = {};
+  const apply = () => { if (master) master.gain.value = audioOn ? .5 : 0; if (ac) { if (paused || !audioOn) { if (ac.state === 'running') ac.suspend(); } else if (ac.state === 'suspended') ac.resume().catch(() => {}); } };
+  const init = () => {
+    if (ac) return;
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.connect(ac.destination); } catch (e) { ac = null; return; }
+    SOUNDS.forEach(k => { fetch('assets/' + k + '.mp3').then(r => r.arrayBuffer()).then(b => ac.decodeAudioData(b, d => { buf[k] = d; }, () => {})).catch(() => {}); });
+    apply();
+  };
+  const play = (k, gain, rate, delay) => {
+    k = CH[ci].sp + k;
+    if (!ac || !audioOn || paused || !buf[k]) return;
+    const s = ac.createBufferSource(); s.buffer = buf[k]; s.playbackRate.value = rate || 1;
+    const gg = ac.createGain(); gg.gain.value = gain; s.connect(gg); gg.connect(master); s.start(ac.currentTime + (delay || 0));
+  };
+  const noise = () => { if (!nb) { nb = ac.createBuffer(1, ac.sampleRate*.3, ac.sampleRate); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1; } return nb; };
+  let alt = 0, lastLaugh = -9;
+  return {
+    init, apply,
+    unlock() { init(); apply(); },
+    whoosh() {
+      if (!ac || !audioOn || paused) return; const t = ac.currentTime, n = ac.createBufferSource(); n.buffer = noise();
+      const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(1800, t + .1); f.Q.value = .9;
+      const gg = ac.createGain(); gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(.07, t + .05); gg.gain.exponentialRampToValueAtTime(.001, t + .13);
+      n.connect(f); f.connect(gg); gg.connect(master); n.start(t); n.stop(t + .15);
+    },
+    slap(kind, ar) { const r = (ar ? 1.06 : 1)*rand(.95, 1.05); if (kind === 'fore') play(alt++ % 2 ? 'fore2' : 'fore1', 1, r); else { play('back1', 1, r); play('fore1', .4, r*1.08); } },
+    crit() { play('fore2', .5, 1.25, .03); },
+    clang() { play('clang', 1, rand(.97, 1.03)); },
+    ko() { play('koslap', 1, .92); play('fore1', .7, .85); play('laugh2', .45, 1.25, .9); },
+    panUp() { play('panup', .8, rand(.95, 1.05)); },
+    panDown() { play('pandown', .6, 1); if (Math.random() < .6) { lastLaugh = clock; play('laugh2', .7, rand(.97, 1.03), .25); } },
+    laugh(force) { if (!force && clock - lastLaugh < 3) return; lastLaugh = clock; play('laugh', .75, rand(.97, 1.03)); },
+    laugh3() { lastLaugh = clock; play('laugh3', .8, 1); },
+    // --- petits sons synthétisés (interface) ---
+    tones(list, type, gain, dur, delay) { if (!ac || !audioOn || paused) return; const t0 = ac.currentTime + (delay || 0);
+      list.forEach((f, i) => { const t = t0 + i*dur, o = ac.createOscillator(), gg = ac.createGain(); o.type = type || 'square'; o.frequency.setValueAtTime(f, t);
+        gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(gain*5, t + .005); gg.gain.exponentialRampToValueAtTime(.001, t + dur*1.6);
+        o.connect(gg); gg.connect(master); o.start(t); o.stop(t + dur*1.7); }); },
+    sweep(f0, f1, dur, gain, type, delay) { if (!ac || !audioOn || paused) return; const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), gg = ac.createGain(); o.type = type || 'square';
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur); gg.gain.setValueAtTime(gain*5, t); gg.gain.exponentialRampToValueAtTime(.001, t + dur*1.2);
+      o.connect(gg); gg.connect(master); o.start(t); o.stop(t + dur*1.3); },
+    tap() { this.tones([660, 990], 'square', .05, .035); },
+    mission() { this.tones([880, 1109, 1319, 1760], 'square', .06, .07); },
+    trophy() { this.tones([784, 988, 1175, 1568], 'triangle', .14, .08); this.tones([1568], 'square', .04, .25, .32); },
+    rankUp() { this.tones([523, 659, 784, 1047], 'square', .07, .1); this.tones([1047, 1319], 'triangle', .16, .35, .4); },
+    timeBonus() { this.sweep(700, 1400, .09, .06, 'square'); this.tones([1760], 'triangle', .1, .06, .09); },
+    multUp(m) { this.tones([330*Math.pow(1.19, m), 330*Math.pow(1.19, m + 1)], 'square', .05, .05); },
+    tick(last) { this.tones([last ? 1320 : 990], 'square', .06, .025); },
+    timeUp() { this.sweep(1200, 300, .5, .07, 'square'); },
+    lose() { this.tones([392, 370, 349, 262], 'triangle', .18, .22); },
+    koBoom() { if (!ac || !audioOn || paused) return; const t = ac.currentTime;                        // K.O. : grosse basse qui tombe + cymbale, puis fanfare arcade
+      const o = ac.createOscillator(), gg = ac.createGain(); o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(28, t + .7);
+      gg.gain.setValueAtTime(1.1, t); gg.gain.exponentialRampToValueAtTime(.001, t + .9); o.connect(gg); gg.connect(master); o.start(t); o.stop(t + .95);
+      const n = ac.createBufferSource(), f = ac.createBiquadFilter(), g2 = ac.createGain(); n.buffer = noise(); n.loop = true; f.type = 'highpass'; f.frequency.value = 3500;
+      g2.gain.setValueAtTime(.35, t); g2.gain.exponentialRampToValueAtTime(.001, t + 1.4); n.connect(f); f.connect(g2); g2.connect(master); n.start(t); n.stop(t + 1.45);
+      this.tones([440, 523, 659], 'square', .07, .09, .55); this.tones([880], 'square', .07, .55, .82); this.tones([440], 'triangle', .14, .55, .82); },
+    bell() { this.tones([1568, 2093], 'triangle', .1, .35); this.tones([1568, 2093], 'triangle', .1, .35, .45); },
+    ctx: () => ac, out: () => master,
+  };
+})();
+
+// ---------- Musique : boucles chiptune générées en direct (aucun fichier), sous les effets ----------
+const music = (() => {
+  const mf = m => 440*Math.pow(2, (m - 69)/12);
+  const SONGS = {
+    // menu : écran de sélection façon arcade, 120 bpm, arpèges en double croches ; la mineur - fa - do - mi
+    menu: { bpm: 120, roots: [45, 41, 48, 40], minor: [1, 0, 0, 0], bass: [0, null, null, 12, null, null, 0, null, 0, null, null, 12, null, null, 7, null],
+      arp: true, chord: [], hat: [2, 6, 10, 14], kick: [0, 4, 8, 12], snare: [], lead: null, vol: .85 },
+    // combat : thème de boss oppressant, 140 bpm, la phrygien (demi-ton la - si bémol), basse obstinée, montée chromatique en fin de cycle
+    game: { bpm: 140, roots: [45, 45, 46, 45, 45, 45, 48, 47], minor: [1, 1, 1, 1, 1, 1, 1, 1], bass: [0, null, 0, 0, null, 0, 1, null, 0, null, 0, 0, null, 12, 1, null],
+      stab: [0, 10], hat: [0, 2, 4, 6, 8, 10, 12, 14], kick: [0, 4, 8, 12, 14], snare: [4, 12], fill: [12, 13, 14, 15], leadEvery: 1,
+      lead: [[76, null, 77, null, 76, null, 74, null, 76, null, null, null, 72, null, 71, null], [69, null, 70, null, 69, null, 67, null, 69, null, null, null, null, null, null, null],
+             [77, null, 78, null, 77, null, 76, null, 77, null, null, null, 74, null, 72, null], [70, null, null, null, 69, null, null, null, 70, null, 72, null, 74, null, 76, null],
+             [76, null, 77, null, 76, null, 74, null, 76, null, null, null, 72, null, 71, null], [69, null, 70, null, 72, null, 74, null, 76, null, 77, null, 76, null, 74, null],
+             [79, null, null, null, 77, null, null, null, 76, null, null, null, 74, null, null, null], [75, null, null, null, 74, null, null, null, 72, null, null, null, 71, null, null, null]], vol: 1 },
+  };
+  let mg = null, cur2 = null, want = null, step = 0, next = 0, timer = 0, rate = 1, loops = 0;
+  const voice = (type, f, t, dur, gain, filt) => { const ac = sfx.ctx(), o = ac.createOscillator(), gg = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+    gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(gain, t + .006); gg.gain.exponentialRampToValueAtTime(.0008, t + dur);
+    let n = o; if (filt) { const fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = filt; o.connect(fl); n = fl; } n.connect(gg); gg.connect(mg); o.start(t); o.stop(t + dur + .02); };
+  let nbuf = null; const noiseB = () => { const ac = sfx.ctx(); if (!nbuf) { nbuf = ac.createBuffer(1, ac.sampleRate*.2, ac.sampleRate); const d = nbuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1; } return nbuf; };
+  const hit = (t, type) => { const ac = sfx.ctx();
+    if (type === 'kick') { const o = ac.createOscillator(), gg = ac.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + .12);
+      gg.gain.setValueAtTime(.55, t); gg.gain.exponentialRampToValueAtTime(.001, t + .16); o.connect(gg); gg.connect(mg); o.start(t); o.stop(t + .18); return; }
+    const n = ac.createBufferSource(), f = ac.createBiquadFilter(), gg = ac.createGain(); n.buffer = noiseB();
+    f.type = type === 'hat' ? 'highpass' : 'bandpass'; f.frequency.value = type === 'hat' ? 7000 : 1800; const d = type === 'hat' ? .035 : .13;
+    gg.gain.setValueAtTime(type === 'hat' ? .07 : .28, t); gg.gain.exponentialRampToValueAtTime(.001, t + d); n.connect(f); f.connect(gg); gg.connect(mg); n.start(t); n.stop(t + d + .02); };
+  function tick() {
+    const ac = sfx.ctx(); if (!ac || !mg) return;
+    if (want !== cur2) {                                                            // changement de morceau : court fondu
+      const t = ac.currentTime; mg.gain.cancelScheduledValues(t); mg.gain.setValueAtTime(mg.gain.value, t); mg.gain.linearRampToValueAtTime(0, t + .25);
+      cur2 = want; step = 0; loops = 0; next = t + .3; if (cur2) mg.gain.linearRampToValueAtTime(.75*SONGS[cur2].vol, t + .55);
+    }
+    if (!cur2 || ac.state !== 'running') return;
+    const S2 = SONGS[cur2], sd = 60/(S2.bpm*rate)/4;
+    while (next < ac.currentTime + .15) {
+      const nb = S2.roots.length, bar = Math.floor(step/16) % nb, i = step % 16, root = S2.roots[bar], third = S2.minor[bar] ? 15 : 16;
+      if (S2.bass[i] !== null) voice('triangle', mf(root + S2.bass[i]), next, sd*1.8, .32);
+      if (S2.arp) voice('square', mf(root + 24 + [0, third - 12, 7, 12][i % 4]), next, sd*.9, .035, 3200);
+      if (S2.stab && S2.stab.includes(i)) [12, 19].forEach(d => voice('sawtooth', mf(root + d), next, sd*3, .03, 1400));
+      if (S2.kick.includes(i)) hit(next, 'kick'); if (S2.snare.includes(i) || (S2.fill && bar === nb - 1 && S2.fill.includes(i))) hit(next, 'snare'); if (S2.hat.includes(i)) hit(next, 'hat');
+      if (S2.lead && loops % (S2.leadEvery ? 1 : 2) === (S2.leadEvery ? 0 : 1) && S2.lead[bar][i] !== null) voice('square', mf(S2.lead[bar][i]), next, sd*2.6, .042, 2600);   // thème une boucle sur deux
+      step++; if (step % (16*nb) === 0) loops++; next += sd;
+    }
+  }
+  return {
+    duck(d) { const ac = sfx.ctx(); if (!ac || !mg || !cur2) return; const t = ac.currentTime; mg.gain.cancelScheduledValues(t); mg.gain.setValueAtTime(mg.gain.value, t); mg.gain.linearRampToValueAtTime(0, t + .05); mg.gain.setValueAtTime(0, t + d); mg.gain.linearRampToValueAtTime(.75*SONGS[cur2].vol, t + d + .6); },
+    set(name, r) { want = name; rate = r || 1; if (!mg && sfx.ctx()) { mg = sfx.ctx().createGain(); mg.gain.value = 0; mg.connect(sfx.out()); timer = setInterval(tick, 40); } },
+  };
+})();
+
+// ---------- Boucle principale, pause et reprise pilotées par le SDK ----------
+let last = performance.now(), raf = 0, firstFrame = false, lastErr = '';
+function loop(now) {
+  raf = requestAnimationFrame(loop);
+  const dt = Math.min(.05, (now - last)/1000); last = now;
+  try { update(dt); render(); } catch (e) { lastErr = String(e && e.message || e); try { if (typeof console !== 'undefined') console.error(e); } catch (e2) {} }   // une erreur ne doit jamais figer le jeu
+  
+  if (!firstFrame) { firstFrame = true; if (YT) { try { YT.game.firstFrameReady(); } catch (e) {} } }
+}
+function pause() { if (paused) return; paused = true; cancelAnimationFrame(raf); sfx.apply(); save(); }
+function resume() { if (!paused) return; paused = false; last = performance.now(); sfx.apply(); raf = requestAnimationFrame(loop); }
+if (YT) {
+  try { audioOn = !!YT.system.isAudioEnabled(); YT.system.onAudioEnabledChange(v => { audioOn = !!v; sfx.apply(); }); } catch (e) {}
+  try { YT.system.onPause(pause); YT.system.onResume(resume); } catch (e) {}
+}
+
+resize(); sfx.init();
+raf = requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
