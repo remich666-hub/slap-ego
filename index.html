@@ -222,8 +222,6 @@ function txt(s, x, y, sc, col, align, alpha, noSh) {
   }
   g.globalAlpha = 1;
 }
-function wrap(s, maxW, sc) { const out2 = []; let line = ''; for (const w of norm(s).split(' ')) { const t = line ? line + ' ' + w : w; if (tw(t, sc) > maxW && line) { out2.push(line); line = w; } else line = t; } if (line) out2.push(line); return out2; }
-function para(s, x, y, sc, col, lh) { const ls = wrap(s, vx1 - vx0 - 12, sc); ls.forEach((l, i) => txt(l, x, y + i*lh, sc, col)); return y + ls.length*lh; }
 const HEART = [54, 127, 127, 62, 28, 8];
 function heart(x, y, on) { g.fillStyle = '#000'; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) if (HEART[r] & (64 >> c)) g.fillRect(x + c + 1, y + r + 1, 1, 1);
   g.fillStyle = on ? '#ff4d6d' : '#5a4a60'; for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) if (HEART[r] & (64 >> c)) g.fillRect(x + c, y + r, 1, 1); if (on) { g.fillStyle = '#fff3e0'; g.fillRect(x + 1, y + 1, 1, 1); } }
@@ -781,6 +779,7 @@ function drawUI() {
   if (phase === 'troph') trophUI();
   if (phase === 'end') endUI();
 }
+let ovl = null;
 function render() {
   if (!cv.width || !cv.height) return;
   g.save();
@@ -799,8 +798,12 @@ function render() {
   out.save(); out.setTransform(u, 0, 0, u, vx0*SCALE, 0);
   try { drawUI(); } finally { out.restore(); g = gl; }
   if (flash > .02) { out.fillStyle = `rgba(${flashC},${flash*.3})`; out.fillRect(0, 0, cv.width, cv.height); }
-  out.fillStyle = 'rgba(0,0,0,.13)'; const st = Math.max(2, Math.round(SCALE)); for (let y = 0; y < cv.height; y += st) out.fillRect(0, y, cv.width, Math.max(1, Math.floor(st/3)));
-  const vg = out.createRadialGradient(cv.width/2, cv.height*.45, cv.height*.3, cv.width/2, cv.height*.45, cv.height*.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)'); out.fillStyle = vg; out.fillRect(0, 0, cv.width, cv.height);
+  if (!ovl || ovl.width !== cv.width || ovl.height !== cv.height) {              // lignes de balayage + vignette : dessinées une seule fois par taille d'écran, puis recopiées
+    ovl = document.createElement('canvas'); ovl.width = cv.width; ovl.height = cv.height; const o = ovl.getContext('2d');
+    o.fillStyle = 'rgba(0,0,0,.13)'; const st = Math.max(2, Math.round(SCALE)); for (let y = 0; y < cv.height; y += st) o.fillRect(0, y, cv.width, Math.max(1, Math.floor(st/3)));
+    const vg = o.createRadialGradient(cv.width/2, cv.height*.45, cv.height*.3, cv.width/2, cv.height*.45, cv.height*.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)'); o.fillStyle = vg; o.fillRect(0, 0, cv.width, cv.height);
+  }
+  out.drawImage(ovl, 0, 0);
 }
 
 // ---------- Son : extraits des vidéos, fichiers du bundle ; suit le réglage audio de YouTube ----------
