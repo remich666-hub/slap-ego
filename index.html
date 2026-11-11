@@ -23,7 +23,7 @@
 const YT = (typeof ytgame !== 'undefined' && ytgame && ytgame.game) ? ytgame : null;
 const L = {
   fr: { load: 'CHARGEMENT', tapPlay: 'TOUCHE POUR JOUER', tapAgain: 'TOUCHE POUR REJOUER', best: 'RECORD', newBest: 'NOUVEAU RECORD!', round: n => 'MANCHE ' + n, ego: 'EGO',
-    sub: 'VIDE SON EGO AVANT LA FIN DU CHRONO', tut: ['GLISSE VERS LA GAUCHE', 'GLISSE VERS LA DROITE', 'ALTERNE VITE = X2', 'POELE: NE TAPE PAS!', 'IL TIRE LA LANGUE: GIFLE = CRITIQUE!'], go: 'A TOI !',
+    sub: 'VIDE SON EGO AVANT LA FIN DU CHRONO', tut: ['GLISSE VERS LA GAUCHE', 'GLISSE VERS LA DROITE', 'ALTERNE VITE = X2', 'POELE: NE TAPE PAS!', 'IL TIRE LA LANGUE: GIFLE = CRITIQUE!'], go: 'A TOI !', ready: 'PRÊT ?', fightGo: 'BAFFE !',
     ar: 'ALLER-RETOUR!', crit: 'CRITIQUE!', pow: ['PAF!', 'CLAC!', 'SBAM!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'AIE...', fight: 'GIFLE!', up: 'IL SE RELEVE!', out: ' EST K.O.!',
     endLives: 'TA MAIN A LACHE', endTime: 'IL A TENU BON...', stats: (h, a, k) => h + ' CLAQUES - ' + a + ' ALLERS-RETOURS - ' + k + ' K.O.',
     sub2: 'Vide son ego avant la fin du chrono', missions: 'MISSIONS', missionOk: 'MISSION OK !', trophy: 'TROPHÉE !', trophies: 'TROPHÉES', back: 'TOUCHE POUR REVENIR', newRank: 'NOUVEAU RANG!', next: 'PROCHAIN:',
@@ -46,7 +46,7 @@ const L = {
     tips: ['quand il se protège, ne tape pas ! Attends qu\'il baisse sa garde : c\'est le moment du critique.', 'alterne gauche et droite : les allers-retours comptent double.',
       'quand le cadre jaune clignote, gifle : coup critique, et +1 s au chrono.', 'enchaîne sans te faire bloquer pour monter le multiplicateur (+1 s à chaque palier, 5 s max par manche).'] },
   en: { load: 'LOADING', tapPlay: 'TAP TO PLAY', tapAgain: 'TAP TO PLAY AGAIN', best: 'BEST', newBest: 'NEW BEST!', round: n => 'ROUND ' + n, ego: 'EGO',
-    sub: 'DRAIN HIS EGO BEFORE TIME RUNS OUT', tut: ['SWIPE LEFT', 'SWIPE RIGHT', 'ALTERNATE FAST = X2', 'FRYING PAN: DO NOT HIT!', 'TONGUE OUT: SLAP = CRITICAL!'], go: 'YOUR TURN!',
+    sub: 'DRAIN HIS EGO BEFORE TIME RUNS OUT', tut: ['SWIPE LEFT', 'SWIPE RIGHT', 'ALTERNATE FAST = X2', 'FRYING PAN: DO NOT HIT!', 'TONGUE OUT: SLAP = CRITICAL!'], go: 'YOUR TURN!', ready: 'READY?', fightGo: 'SLAP!',
     ar: 'DOUBLE SLAP!', crit: 'CRITICAL!', pow: ['WHAP!', 'SMACK!', 'SLAP!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'OUCH...', fight: 'SLAP!', up: 'HE GETS UP!', out: ' IS OUT!',
     endLives: 'YOUR HAND GAVE UP', endTime: 'HE HELD ON...', stats: (h, a, k) => h + ' SLAPS - ' + a + ' DOUBLE SLAPS - ' + k + ' K.O.',
     sub2: 'Drain his ego before time runs out', missions: 'MISSIONS', missionOk: 'MISSION DONE!', trophy: 'TROPHY!', trophies: 'TROPHIES', back: 'TAP TO GO BACK', newRank: 'NEW RANK!', next: 'NEXT:',
@@ -89,13 +89,13 @@ function readProg(o) {
 }
 function save() {
   if (YT) { if (saveOk) { try { YT.game.saveData(JSON.stringify(Object.assign({ v: 2, best, tut: tutDone ? 1 : 0 }, progData()))).catch(() => {}); } catch (e) {} } return; }
-  
+  /*WEB*/ try { localStorage.setItem('bonk-beauf-best2', JSON.stringify(best)); localStorage.setItem('bonk-beauf-tut', tutDone ? '1' : '0'); localStorage.setItem('bonk-prog', JSON.stringify(progData())); } catch (e) {} /*ENDWEB*/
 }
 if (YT) {
   try { YT.game.loadData().then(d => { try { const o = JSON.parse(d || '{}'); best = +o.best || 0; tutDone = !!o.tut; readProg(o); } catch (e) {} saveOk = true; dataReady = true; }, () => { dataReady = true; }); } catch (e) { dataReady = true; }
   try { const p = YT.system.getLanguage && YT.system.getLanguage(); if (p && p.then) p.then(setLang, () => {}); } catch (e) {}
 }
-
+/*WEB*/ else {  try { best = +JSON.parse(localStorage.getItem('bonk-beauf-best2')) || 0; tutDone = localStorage.getItem('bonk-beauf-tut') === '1'; readProg(JSON.parse(localStorage.getItem('bonk-prog') || 'null')); } catch (e) {} } /*ENDWEB*/
 
 // ---------- Police bitmap 5 × 7 embarquée ----------
 const FONT = {
@@ -232,6 +232,11 @@ let phase = 'load', round = 1, time = ROUND_T, score = 0, hits = 0, ars = 0, kos
 let cur = null, queued = null, fade = null, clock = 0, stateT = 0, guardDur = 1, hitstop = 0, endT = 0, endTitle = '', isBest = false;
 let egoShake = 0, startCi = 0, roundClean = true, roundBonus = 0, timeFx = null, endReason = '', endStage = 'main', endMainT = 0, tipI = 0;
 let streak = 0, streakMax = 3, warn = 0, chain = 0, mult = 1, tut = -1, tutT = 0, tutMiss = 0, tour = 0, koCount = 0, koNeed = 1;
+// intro du combat : PRÊT ? -> le HUD descend -> BAFFE ! (chrono et gifles bloqués jusqu'au BAFFE)
+const INTRO_GO = 1.4, INTRO_END = 2.15;
+let intro = null;
+const introLock = () => !!intro && !intro.go;
+function startIntro() { intro = { t: 0, go: false }; banner = null; hpShown = 0; sfx.sweep(180, 720, 1.25, .025, 'triangle'); }
 let lastDir = 0, lastHitT = -9, shake = 0, flash = 0, flashC = '255,255,255', zoom = 0, banner = null;
 const floats = [], sparks = [], timers = [];
 const after = (s, fn) => timers.push({ t: s, fn });                        // minuteries du jeu : elles s'arrêtent avec la pause
@@ -300,7 +305,7 @@ function panUp() {
 function critNow() { const c = A[cur.key].crit, l = localOf(cur); return !!c && l >= c[0] && l <= c[1]; }
 
 function slap(kind) {
-  if (phase !== 'play' || !cur || isBusy()) return;
+  if (phase !== 'play' || !cur || isBusy() || introLock()) return;
   if (cur.name === 'fore' || cur.name === 'back') { if (localOf(cur) < A[cur.name].free) { queued = kind; return; } }
   sfx.whoosh();
   if (panUp()) { play('block'); return; }
@@ -364,7 +369,7 @@ function retaliate() {
 }
 function tutStep(n) { tut = n; tutT = 0; tutMiss = 0; }
 function tutPan() { queued = null; guardDur = 1.7; play('up'); cur.t = A.up.pan/cur.fps; warn = 1; sfx.panUp(); }
-function tutEnd() { tut = -1; tutDone = true; save(); score = 0; hits = 0; ars = 0; hp = maxHp; time = ROUND_T + timeBonus; chain = 0; mult = 1; rollPatience(); banner = { txt: T.go, sub: T.fight, t: 0 }; }
+function tutEnd() { tut = -1; tutDone = true; save(); score = 0; hits = 0; ars = 0; hp = maxHp; time = ROUND_T + timeBonus; chain = 0; mult = 1; rollPatience(); startIntro(); }
 function nextBehavior() {
   rollPatience();
   const d = diff();
@@ -394,14 +399,14 @@ function onEnd() {
     }
     return;
   }
-  if (n === 'enter') { const soft = A.enter.soft; play('idle'); if (soft) fade.dur = .35; sfx.laugh3(); return; }
+  if (n === 'enter') { const soft = A.enter.soft; play('idle'); if (soft) fade.dur = .35; sfx.laugh3(); if (phase === 'play' && tut < 0) intro = { t: INTRO_GO, go: false, short: true }; return; }
 }
 function start() {
   sfx.unlock(); timeFx = null; zones = [];
   applyPerks(); fillMissions(); missions.forEach(m => { m.done = false; if (m.t === undefined) m.t = tierOf(); }); resetGS(); gameXp = 0; doneNow = []; toasts.length = 0; rankUp = -1;
   setChar(ready(CH[startCi]) ? startCi : 0); tour = 0; koCount = 0; koNeed = 1; phase = 'play'; score = 0; hits = 0; ars = 0; kos = 0; lives = maxLives; lastDir = 0; queued = null; floats.length = 0; sparks.length = 0; timers.length = 0;
   newRound(1); hpShown = 1; chain = 0; mult = 1; play('idle'); stateT = -.6;
-  if (!tutDone) { tut = 0; tutT = 0; banner = null; }
+  if (!tutDone) { tut = 0; tutT = 0; banner = null; intro = null; } else startIntro();
   after(.25, () => sfx.laugh(true));
 }
 function finish(reason) {
@@ -457,7 +462,7 @@ window.addEventListener('keydown', e => {
 let readySent = false;
 function update(dt) {
   clock += dt;
-  music.set(phase === 'play' || phase === 'over' ? 'game' : phase === 'menu' || phase === 'troph' ? 'menu' : null, phase === 'play' && tut < 0 && time <= 5 ? 1.12 : 1);
+  music.set(phase === 'play' && tut >= 0 ? 'menu' : phase === 'play' && intro && !intro.go && !intro.short ? null : phase === 'play' || phase === 'over' ? 'game' : phase === 'menu' || phase === 'troph' ? 'menu' : null, phase === 'play' && tut < 0 && time <= 5 ? 1.12 : 1);
   if (phase === 'load') {
     if (ready(CH[0]) && dataReady) { phase = 'menu'; play('taunt'); for (let k = 1; k < CH.length; k++) loadChar(CH[k]); if (!readySent) { readySent = true; if (YT) { try { YT.game.gameReady(); } catch (e) {} } } }
     return;
@@ -470,6 +475,12 @@ function update(dt) {
   for (let i = sparks.length - 1; i >= 0; i--) { const p = sparks[i]; p.t += dt; p.vy += 220*dt; p.x += p.vx*dt; p.y += p.vy*dt; if (p.t > p.life) sparks.splice(i, 1); }
   for (let i = floats.length - 1; i >= 0; i--) { floats[i].t += dt; if (floats[i].t > (floats[i].huge ? 1.3 : .8)) floats.splice(i, 1); }
   if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
+  if (intro) {
+    intro.t += dt;
+    if (!intro.go && intro.t >= INTRO_GO) { intro.go = true; flash = intro.short ? .5 : .9; flashC = '255,216,74'; shake = intro.short ? 6 : 11; zoom = intro.short ? 1.12 : 1.3; sfx.fight(intro.short); }
+    if (intro.t > INTRO_END) intro = null;
+  }
+  if (intro && !intro.go) hpShown = ease(clamp((intro.t - .8)/.5, 0, 1));
   if (toasts.length) { toasts[0].t += dt; if (toasts[0].t > 1.8) toasts.shift(); }
   warn = Math.max(0, warn - dt*2.2); egoShake = Math.max(0, egoShake - dt*5);
   if (hitstop > 0) { hitstop -= dt; return; }
@@ -477,7 +488,7 @@ function update(dt) {
   if (!cur) return;
   cur.t += dt; stateT += dt;
   if (tut >= 0) { tutT += dt; if (tut === 3 && cur.name === 'down') tutStep(4); }
-  if (phase === 'play' && tut < 0 && !['ko', 'enter'].includes(cur.name)) {
+  if (phase === 'play' && tut < 0 && !introLock() && !['ko', 'enter'].includes(cur.name)) {
     const before = Math.ceil(time); time -= dt;
     if (Math.ceil(time) < before && before <= 5 && time > 0) sfx.tick(before === 1);              // tic-tac des 5 dernières secondes
     if (time <= 0) { time = 0; phase = 'over'; finish('time'); return; }
@@ -492,7 +503,7 @@ function update(dt) {
   if (tut === 4 && (cur.name === 'fore' || cur.name === 'back') && l >= a.free + 3) { queued = null; play('taunt'); return; }
   if (queued && (cur.name === 'fore' || cur.name === 'back') && l >= a.free) { const q = queued; queued = null; play('idle'); slap(q); return; }
   if (cur.name === 'idle') {
-    if (phase === 'play') { if (tut < 0) { if (stateT > cur.wait) nextBehavior(); } else if (tut === 4 && stateT > .5) play('taunt'); else if (tut === 3 && stateT > .3) tutPan(); }
+    if (phase === 'play') { if (tut < 0) { if (introLock()) stateT = 0; else if (stateT > cur.wait) nextBehavior(); } else if (tut === 4 && stateT > .5) play('taunt'); else if (tut === 3 && stateT > .3) tutPan(); }
     else if (stateT > 1.2) play('taunt');                                 // menu et fin : il nargue en boucle
     return;
   }
@@ -564,22 +575,29 @@ function chrono(cx, cy) {                                                       
   tx(String(Math.ceil(time)), 0, -LH('px', 17)/2, { f: 'px', size: 17, col: red && Math.floor(clock*4) % 2 ? C.pink : C.cream });
   g.restore();
 }
+function hudIn(d) { if (tut >= 0) return 0; if (!intro || intro.go || intro.short) return 1; return ease(clamp((intro.t - d)/.38, 0, 1)); }
 function hud() {
-  const T0 = TOPD(), x0 = 12, x1 = WD - 12, rowY = T0 + 12, rowH = 50;
+  const T0 = TOPD(), x0 = 12, x1 = WD - 12, rowY = T0 + 12, rowH = 50, off = T0 + 120;
+  const kS = hudIn(.3), kH = hudIn(.45), kC = hudIn(.6), kB = hudIn(.75);
+  g.save(); g.translate(0, -(1 - kS)*off);
   // gauche : score (Silkscreen 26, ombre 3 px) + ×3 (Space Grotesk 20 bold), puis la manche (12 px)
   const sw = tx(fmt(score), x0, rowY + 3, { f: 'px', size: 26, lh: 26, col: C.yel, al: 'l', sh: [[3, 3, '#000']] });
   if (mult > 1) tx('×' + mult, x0 + sw + 6, rowY + 4, { f: 'sg', size: 20, w: 700, col: C.mint, al: 'l', sh: [[0, 2, '#000']] });
   tx(T.roundKo(round, koCount, koNeed), x0, rowY + 31, { f: 'sg', size: 12, w: 500, col: C.cream, al: 'l', glow: [1, 3, '#000'] });
+  g.restore(); g.save(); g.translate(0, -(1 - kC)*off);
   // droite : chrono 50 px ; à sa gauche (gap 10) les cœurs 21 × 18 (gap 5) avec « +1 s » au-dessus
   chrono(x1 - 25, rowY + rowH/2);
+  g.restore(); g.save(); g.translate(0, -(1 - kH)*off);
   const hr = x1 - 50 - 10, hw = 21, hg = 5, n = maxLives, hx0 = hr - n*hw - (n - 1)*hg;
   for (let i = 0; i < n; i++) pheart(hx0 + i*(hw + hg), rowY + 25, i < lives, 3);
   if (timeFx && timeFx.t < 1.3) { const a2 = 1 - ease(clamp((timeFx.t - .9)/.4, 0, 1)); tx('+' + timeFx.n + ' s', hr, rowY + 4 - ease(clamp(timeFx.t/.3, 0, 1))*3, { f: 'sg', size: 14, w: 700, col: C.mint, al: 'r', a: a2, glow: [1, 3, '#000'] }); }
+  g.restore(); g.save(); g.translate(0, -(1 - kB)*off);
   // barre d'ego : 18 px, arrondi 9, bord 1 px crème 70 %
   const by = rowY + rowH + 8 + (egoShake > 0 ? rand(-3, 3)*egoShake : 0), bw = x1 - x0;
   rr(x0 + .5, by + .5, bw - 1, 17, 9, 'rgba(22,13,28,.85)', 'rgba(255,243,224,.7)', 1);
   if (hpShown > 0) { g.save(); rr(x0 + 1, by + 1, bw - 2, 16, 8); g.clip(); g.fillStyle = C.pink; g.fillRect(x0, by, bw*hpShown, 18); g.restore(); }
   tx(T.ego, x0 + 8, by + 1, { f: 'sg', size: 12, w: 700, col: C.cream, al: 'l', ls: 1, lh: 16 });
+  g.restore();
   if (phase === 'play' && cur && !isBusy() && critNow() && Math.floor(clock*10) % 2 === 0) { g.strokeStyle = C.yel; g.lineWidth = 4; g.strokeRect(2, 2, WD - 4, HD() - 4); }   // cadre jaune 4 px : moment du critique
   if (tut >= 0) tutoUI();
   if (warn > 0) { const k = 1 - warn; tx('!', MID, by + 26, { f: 'px', size: k < .15 ? 70 : 56, col: C.pink, a: clamp(warn*2.5, 0, 1), sh: [[3, 3, '#000']] }); }
@@ -623,6 +641,22 @@ function toastUI() {                                                            
   const tw1 = tx(t0.b + (t0.r ? ' ' : ''), x + 54, y + 26, { f: 'sg', size: 14, w: 500, col: C.cream, al: 'l', a: a2 });
   if (t0.r) tx(t0.r, x + 54 + tw1, y + 26, { f: 'sg', size: 14, w: 700, col: t0.c, al: 'l', a: a2 });
   g.globalAlpha = 1;
+}
+function introVeil() {                                                              // voile sous le HUD : monte avec PRÊT ?, part au BAFFE
+  if (!intro || intro.short) return; const t = intro.t;
+  const v = intro.go ? .5*(1 - ease(clamp((t - INTRO_GO)/.3, 0, 1))) : .5*ease(clamp(t/.3, 0, 1)); if (v > 0) veil(v);
+}
+function introUI() {
+  const t = intro.t, s = intro.short, y = HD()/2 - 70;
+  if (!s && !intro.go) {
+    const k = ease(clamp((t - .05)/.3, 0, 1)), sc = 1.35 - .35*k, a = k*(1 - ease(clamp((t - INTRO_GO + .12)/.12, 0, 1)));
+    g.save(); g.translate(MID, y + 36); g.scale(sc, sc); tx(T.ready, 0, -26, { f: 'px', size: 44, lh: 52, col: C.cream, a, sh: [[3, 3, '#000']] }); g.restore();
+  }
+  if (intro.go) {
+    const u = t - INTRO_GO, pop = u < .14 ? 1.9 - .9*ease(u/.14) : 1 + .04*Math.sin(Math.min(u, .5)*Math.PI*6)*Math.exp(-u*6), a = 1 - ease(clamp((u - (INTRO_END - INTRO_GO - .3))/.3, 0, 1));
+    const sz = s ? 48 : 64;
+    g.save(); g.translate(MID, y + 36); g.scale(pop, pop); tx(T.fightGo, 0, -sz*.6, { f: 'px', size: sz, lh: sz*1.2, col: C.yel, a, sh: [[4, 4, C.pink], [7, 7, '#000']] }); g.restore();
+  }
 }
 function bannerUI() {
   const inn = ease(clamp(banner.t/.25, 0, 1)), a2 = 1 - ease(clamp((banner.t - 1.2)/.4, 0, 1)), y = 392;
@@ -768,9 +802,11 @@ function drawUI() {
     if (f.sg) tx(f.txt, fx, fy - f.sg, { f: 'sg', size: f.sg*2*pop, w: 700, col: f.c, a: a2, sh: [[0, f.sg > 15 ? 3 : 2, '#000']] });
     else { const size = (f.sc === 1 ? 30 : f.sc*14)*pop; tx(f.txt, fx, fy - size*.6, { f: 'px', size, col: f.c, a: a2, sh: [[3, 3, '#000']] }); }
   }
+  if (phase === 'play') introVeil();
   if (phase === 'play' || phase === 'over') hud();
   if (toasts.length && (phase === 'play' || phase === 'over')) toastUI();
   if (banner && phase === 'play') bannerUI();
+  if (intro && phase === 'play') introUI();
   if (phase === 'load') {
     logo(HD()/2 - 140); const bw = 180, x = MID - 90, y = HD()/2 + 10, k = CH[0].loaded/CH[0].n;
     bar(x, y, bw, 10, Math.max(.04, k), C.yel); tx(T.load, MID, y + 22, { f: 'sg', size: 14, w: 500, col: C.cream });
@@ -867,6 +903,11 @@ const sfx = (() => {
       const n = ac.createBufferSource(), f = ac.createBiquadFilter(), g2 = ac.createGain(); n.buffer = noise(); n.loop = true; f.type = 'highpass'; f.frequency.value = 3500;
       g2.gain.setValueAtTime(.35, t); g2.gain.exponentialRampToValueAtTime(.001, t + 1.4); n.connect(f); f.connect(g2); g2.connect(master); n.start(t); n.stop(t + 1.45);
       this.tones([440, 523, 659], 'square', .07, .09, .55); this.tones([880], 'square', .07, .55, .82); this.tones([440], 'triangle', .14, .55, .82); },
+    fight(short) { if (!ac || !audioOn || paused) return; const t = ac.currentTime;                     // BAFFE ! : coup sourd + cloche de ring
+      const o = ac.createOscillator(), gg = ac.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + .35);
+      gg.gain.setValueAtTime(short ? .6 : .95, t); gg.gain.exponentialRampToValueAtTime(.001, t + .45); o.connect(gg); gg.connect(master); o.start(t); o.stop(t + .5);
+      play('fore1', short ? .5 : .8, .9);
+      this.tones([1568, 2093], 'triangle', short ? .07 : .11, .3, .02); if (!short) this.tones([1568, 2093], 'triangle', .09, .3, .34); },
     bell() { this.tones([1568, 2093], 'triangle', .1, .35); this.tones([1568, 2093], 'triangle', .1, .35, .45); },
     ctx: () => ac, out: () => master,
   };
