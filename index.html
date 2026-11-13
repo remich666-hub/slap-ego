@@ -24,7 +24,7 @@ const YT = (typeof ytgame !== 'undefined' && ytgame && ytgame.game) ? ytgame : n
 const L = {
   fr: { load: 'CHARGEMENT', tapPlay: 'TOUCHE POUR JOUER', tapAgain: 'TOUCHE POUR REJOUER', best: 'RECORD', newBest: 'NOUVEAU RECORD!', round: n => 'MANCHE ' + n, ego: 'EGO',
     sub: 'VIDE SON EGO AVANT LA FIN DU CHRONO', tut: ['GLISSE VERS LA GAUCHE', 'GLISSE VERS LA DROITE', 'ALTERNE VITE = X2', 'POELE: NE TAPE PAS!', 'IL TIRE LA LANGUE: GIFLE = CRITIQUE!'], go: 'A TOI !', ready: 'PRÊT ?', fightGo: 'BAFFE !',
-    ar: 'ALLER-RETOUR!', crit: 'CRITIQUE!', pow: ['PAF!', 'CLAC!', 'SBAM!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'AIE...', fight: 'GIFLE!', up: 'IL SE RELEVE!', out: ' EST K.O.!',
+    ar: 'ALLER-RETOUR!', crit: 'CRITIQUE!', pow: ['PAF!', 'CLAC!', 'SBAM!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'AIE...', fight: 'GIFLE!', bonus: 'BONUS!', bonusSub: 'Caresse-le... pas trop', purr: 'RONRON', pet: ['PRRR!', 'RON RON!', 'MRRR!'], scratch: 'GRRR!', kslap: 'SLAP!', tourDone: n => 'TOUR ' + n + ' OK!', back2: 'ILS REVIENNENT', tourN: n => 'TOUR ' + n, harder: n => n >= 3 ? '3 K.O. chacun · encore plus rapides' : '2 K.O. chacun · plus rapides · feintes', bonusT: n => '+' + n + ' s pour la suite', up: 'IL SE RELEVE!', out: ' EST K.O.!',
     endLives: 'TA MAIN A LACHE', endTime: 'IL A TENU BON...', stats: (h, a, k) => h + ' CLAQUES - ' + a + ' ALLERS-RETOURS - ' + k + ' K.O.',
     sub2: 'Vide son ego avant la fin du chrono', missions: 'MISSIONS', missionOk: 'MISSION OK !', trophy: 'TROPHÉE !', trophies: 'TROPHÉES', back: 'TOUCHE POUR REVENIR', newRank: 'NOUVEAU RANG!', next: 'PROCHAIN:',
     ranks: ['MAIN MOLLE', 'TAPOTEUR', 'CLAQUEUR', 'GIFLEUR', 'BAFFEUR', "PAUME D'OR", 'MAIN DE FER', 'ROI DE LA BAFFE', 'LÉGENDE DE LA BAFFE'],
@@ -47,7 +47,7 @@ const L = {
       'quand le cadre jaune clignote, gifle : coup critique, et +1 s au chrono.', 'enchaîne sans te faire bloquer pour monter le multiplicateur (+1 s à chaque palier, 5 s max par manche).'] },
   en: { load: 'LOADING', tapPlay: 'TAP TO PLAY', tapAgain: 'TAP TO PLAY AGAIN', best: 'BEST', newBest: 'NEW BEST!', round: n => 'ROUND ' + n, ego: 'EGO',
     sub: 'DRAIN HIS EGO BEFORE TIME RUNS OUT', tut: ['SWIPE LEFT', 'SWIPE RIGHT', 'ALTERNATE FAST = X2', 'FRYING PAN: DO NOT HIT!', 'TONGUE OUT: SLAP = CRITICAL!'], go: 'YOUR TURN!', ready: 'READY?', fightGo: 'SLAP!',
-    ar: 'DOUBLE SLAP!', crit: 'CRITICAL!', pow: ['WHAP!', 'SMACK!', 'SLAP!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'OUCH...', fight: 'SLAP!', up: 'HE GETS UP!', out: ' IS OUT!',
+    ar: 'DOUBLE SLAP!', crit: 'CRITICAL!', pow: ['WHAP!', 'SMACK!', 'SLAP!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'OUCH...', fight: 'SLAP!', bonus: 'BONUS!', bonusSub: 'Pet him... not too much', purr: 'PURR', pet: ['PRRR!', 'PURR!', 'MRRR!'], scratch: 'HISSS!', kslap: 'SLAP!', tourDone: n => 'LAP ' + n + ' CLEAR!', back2: 'THEY ARE BACK', tourN: n => 'LAP ' + n, harder: n => n >= 3 ? '3 K.O. each · even faster' : '2 K.O. each · faster · feints', bonusT: n => '+' + n + ' s for later', up: 'HE GETS UP!', out: ' IS OUT!',
     endLives: 'YOUR HAND GAVE UP', endTime: 'HE HELD ON...', stats: (h, a, k) => h + ' SLAPS - ' + a + ' DOUBLE SLAPS - ' + k + ' K.O.',
     sub2: 'Drain his ego before time runs out', missions: 'MISSIONS', missionOk: 'MISSION DONE!', trophy: 'TROPHY!', trophies: 'TROPHIES', back: 'TAP TO GO BACK', newRank: 'NEW RANK!', next: 'NEXT:',
     ranks: ['SOFT HAND', 'TAPPER', 'SLAPPER', 'SMACKER', 'WALLOPER', 'GOLDEN PALM', 'IRON HAND', 'SLAP KING', 'SLAP LEGEND'],
@@ -189,10 +189,21 @@ const CH = [
     ko: {f:[212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246],fps:12,hit:0},
     enter: {f:[247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277],fps:12}
   } },
+  { name: { fr: "LE CHATON", en: "THE KITTEN" }, pre: "k", sp: "k_", n: 6, per: 33, imgs: [], loaded: 0, bonus: true, A: {
+    idle: {f:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35],fps:10,loop:true},
+    back: {f:[36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53],fps:12,hit:4,free:9},
+    fore: {f:[54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78],fps:12,hit:5,free:11},
+    warn: {f:[79,80,81,82,83,84,85,86,87,88,89,90,91,92],fps:12},
+    warnHold: {f:[93,94,95,96,95,94],fps:8,loop:true},
+    griffe: {f:[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118],fps:12,hit:4},
+    calm: {f:[119,120,121,122,123,124,125,126,127,128,129,130,131],fps:14},
+    final: {f:[132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179],fps:12}
+  } },
 ];
 function loadChar(c) { if (c.imgs.length) return; for (let i = 0; i < c.n; i++) { const im = new Image(); im.onload = () => { c.loaded++; }; im.src = '' + c.pre + i + '.webp'; c.imgs.push(im); } }
 const ready = c => c.loaded === c.n;
 loadChar(CH[0]);
+const KI = CH.findIndex(c => c.bonus), NB = KI < 0 ? CH.length : KI;           // le chaton (bonus) est rangé en dernier, hors rotation
 [['SG', 'sg.woff2', '300 700'], ['PX', 'px400.woff2', '400'], ['PX', 'px700.woff2', '700']].forEach(([n, f, w]) => { try { new FontFace(n, 'url(' + f + ')', { weight: w }).load().then(ff => { document.fonts.add(ff); }).catch(() => {}); } catch (e) {} });   // polices embarquées
 let ci = 0, A = CH[0].A;
 function setChar(k) { ci = k; A = CH[k].A; }
@@ -250,6 +261,8 @@ let streak = 0, streakMax = 3, warn = 0, chain = 0, mult = 1, tut = -1, tutT = 0
 // intro du combat : PRÊT ? -> le HUD descend -> BAFFE ! (chrono et gifles bloqués jusqu'au BAFFE)
 const INTRO_GO = 1.4, INTRO_END = 2.15;
 let intro = null;
+const BONUS_T = 14, TS_END = 5.6;
+let bonus = null, bonusN = 0, tourScr = null, carryT = 0;     // bonus chaton (entre deux tours), écran « Ils reviennent », temps gagné pour la manche suivante
 const introLock = () => !!intro && !intro.go;
 function startIntro() { intro = { t: 0, go: false }; banner = null; hpShown = 0; sfx.sweep(180, 720, 1.25, .025, 'triangle'); }
 let lastDir = 0, lastHitT = -9, shake = 0, flash = 0, flashC = '255,255,255', zoom = 0, banner = null;
@@ -266,8 +279,8 @@ const MK = { crit: [3, 5, 8, 12], ar: [3, 6, 10, 15], ko: [1, 2, 4, 6], pts: [80
 const REWARD = [250, 400, 600, 900];
 const tierOf = () => Math.min(3, Math.floor(rankOf(xp)/2));
 function newMission() {
-  const ks = Object.keys(MK).filter(k => !missions.some(m => m.k === k) && (k !== 'reach' || CH.length > 1));
-  const k = pick(ks), t = tierOf(); let n = MK[k][t]; if (k === 'reach') n = Math.min(n, CH.length - 1);
+  const ks = Object.keys(MK).filter(k => !missions.some(m => m.k === k) && (k !== 'reach' || NB > 1));
+  const k = pick(ks), t = tierOf(); let n = MK[k][t]; if (k === 'reach') n = Math.min(n, NB - 1);
   return { k, n, p: 0, t };
 }
 function fillMissions() { missions = missions.filter(m => MK[m.k]); while (missions.length < 3) missions.push(newMission()); }
@@ -284,7 +297,7 @@ function checkProgress() {
 }
 const TR = () => {
   const l = [['k1', () => TOT.kos + kos >= 1]];
-  CH.forEach((c, k) => l.push(['c' + k, () => (TOT.ko[k] || 0) >= 1 || (GS && GS['ko' + k] > 0), k]));
+  CH.forEach((c, k) => !c.bonus && l.push(['c' + k, () => (TOT.ko[k] || 0) >= 1 || (GS && GS['ko' + k] > 0), k]));
   l.push(['h100', () => TOT.hits + (GS ? GS.hits : 0) >= 100], ['h1k', () => TOT.hits + (GS ? GS.hits : 0) >= 1000], ['m5', () => GS && GS.mult >= 5], ['cr10', () => GS && GS.crit >= 10],
     ['p5k', () => GS && GS.pts >= 5000], ['p10k', () => GS && GS.pts >= 10000], ['tour', () => GS && GS.tour > 0], ['r5', () => GS && round >= 5 && phase === 'play'], ['cl', () => GS && GS.clean > 0], ['leg', () => rankOf(xp) >= RANK_XP.length - 1]);
   return l;
@@ -302,7 +315,8 @@ function tauntKey(force) {                                   // plusieurs nargue
 }
 function play(name, speed, force) {
   if (cur) fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: .09 };
-  const key = name === 'taunt' ? tauntKey(force) : name;
+  let key = name === 'taunt' ? tauntKey(force) : name;
+  if (!A[key]) { name = 'idle'; key = 'idle'; }
   if (name === 'taunt') lastTaunt = key;
   if (name === 'taunt') sfx.taunt(key, (speed || 1)*A[key].fps/12); else if (name !== 'idle') sfx.stopTaunt();
   if (name !== 'down' && name !== 'taunt') mockNext = false;
@@ -321,7 +335,9 @@ function panUp() {
 function critNow() { const c = A[cur.key].crit, l = localOf(cur); return !!c && l >= c[0] && l <= c[1]; }
 
 function slap(kind) {
-  if (phase !== 'play' || !cur || isBusy() || introLock()) return;
+  if (phase !== 'play' || !cur || introLock()) return;
+  if (bonus) { bonusSlap(kind); return; }
+  if (isBusy()) return;
   if (cur.name === 'fore' || cur.name === 'back') { if (localOf(cur) < A[cur.name].free) { queued = kind; return; } }
   sfx.whoosh();
   if (panUp()) { play('block'); return; }
@@ -375,7 +391,7 @@ function knockout(c) {
 }
 function rollPatience() { const r = Math.random(); streakMax = Math.max(2, (r < .15 ? 2 : r < .4 ? 3 : r < .65 ? 4 : r < .85 ? 5 : 7) - Math.round(diff()*2)); streak = 0; }   // patience très variable : de 2 à 7 gifles
 function newRound(n) {
-  round = n; time = ROUND_T + timeBonus; roundClean = true; roundBonus = 0; maxHp = 8 + (n - 1)*4; hp = maxHp;
+  round = n; time = ROUND_T + timeBonus + carryT; if (carryT > 0) { timeFx = { n: carryT, t: 0 }; } carryT = 0; roundClean = true; roundBonus = 0; maxHp = 8 + (n - 1)*4; hp = maxHp;
   banner = { txt: T.round(n), sub: charName(), t: 0 };
   rollPatience();
 }
@@ -394,6 +410,7 @@ function nextBehavior() {
 }
 function onEnd() {
   const n = cur.name;
+  if (bonus) { bonusEnd(n); return; }
   if (n === 'fore' && cur.crit && A.ouch && phase === 'play' && tut < 0) { play('ouch'); return; }   // apres un critique : il a mal
   if (n === 'ouch') { play('idle'); return; }
   if (n === 'fore' || n === 'back') { play('idle'); stateT = -rand(.15, .4); return; }
@@ -407,7 +424,9 @@ function onEnd() {
     if (phase === 'play') {                                              // perso suivant : fondu du décor vide de l'un vers l'entrée de l'autre
       // un perso se bat en plusieurs K.O. : 1 au premier tour, 2 au deuxième, 3 ensuite ; entre deux K.O. il se relève
       let k = ci, same = koCount < koNeed;
-      if (!same) { const nx = (ci + 1) % CH.length; if (ready(CH[nx])) { k = nx; if (nx === 0) tour++; } else tour++; koCount = 0; koNeed = Math.min(3, tour + 1); }
+      if (!same) { const nx = (ci + 1) % NB;
+        if (nx === 0) { koCount = 0; fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: .4 }; cur = null; lapEnd(); return; }   // fin du tour : bonus chaton puis « Ils reviennent »
+        if (ready(CH[nx])) k = nx; else tour++; koCount = 0; koNeed = Math.min(3, tour + 1); }
       fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: k === ci ? .09 : .4 }; cur = null;
       if (k !== ci) flash = .6, flashC = '255,255,255';
       setChar(k); newRound(round + 1); if (same) banner.sub = T.up; play('enter'); if (CH[k].tk) { if (CH[k].enterSnd) fade.dur = .4; sfx.enter(); }
@@ -417,12 +436,77 @@ function onEnd() {
   }
   if (n === 'enter') { const soft = A.enter.soft; play('idle'); if (soft) fade.dur = .35; if (!CH[ci].tk) sfx.laugh3(); if (phase === 'play' && tut < 0) intro = { t: INTRO_GO, go: false, short: true }; return; }
 }
+// ---------- Bonus chaton : on le caresse, il ne faut pas insister quand il est agacé ; à la fin, c'est lui qui gifle ----------
+function lapEnd() { if (KI >= 0 && ready(CH[KI]) && bonusN < 2) startBonus(); else startTourScr(); }
+function startBonus() {
+  bonusN++; bonus = { g: 0, gs: 0, full: false, fin: false, lock: 1.3, hold: 1 };
+  setChar(KI); flash = .6; flashC = '255,255,255'; time = BONUS_T; queued = null; streak = 0;
+  banner = { txt: T.bonus, sub: T.bonusSub, t: 0 };
+  play('idle'); cur.wait = rand(1.2, 2); if (fade) fade.dur = .45; sfx.kpurr();
+}
+function bonusSlap(kind) {
+  if (bonus.lock > 0 || bonus.fin || bonus.full) return;
+  const n = cur.name;
+  if (n === 'warn' || n === 'warnHold') { queued = null; play('griffe'); sfx.whoosh(); return; }         // il était agacé : il griffe
+  if (n === 'griffe' || n === 'calm') return;
+  if ((n === 'fore' || n === 'back') && localOf(cur) < A[n].free) { queued = kind; return; }
+  play(kind); cur.dir = kind === 'fore' ? -1 : 1; lastHitT = clock;
+}
+function bonusHit(c) {
+  if (c.name === 'griffe') {
+    bonus.g = Math.max(0, bonus.g - .3); chain = 0; mult = 1;
+    shake = 9; flash = 1; flashC = '255,77,109'; zoom = 1; hitstop = .08;
+    burst(96, 130, 0, 18, ['#ff4d6d', '#ffffff']); addFloat(T.scratch, 90, 84, '#ff4d6d', 3); sfx.khiss();
+    return;
+  }
+  const dir = c.dir || (c.name === 'fore' ? -1 : 1);
+  bonus.g = Math.min(1, bonus.g + .125); score += 20; hits++;
+  zoom = .35; burst(dir < 0 ? 104 : 74, 112, 0, 8, ['#ff9ebb', '#ffffff']);
+  addFloat(pick(T.pet), dir < 0 ? 112 : 68, 92, '#7ff0c0', 1); sfx.kpet(c.name);
+  if (bonus.g >= 1 && !bonus.full) { bonus.full = true; addFloat(T.purr + '!', 90, 150, '#ffd84a', 2, .2); sfx.timeBonus(); }
+}
+function bonusBehavior() {
+  if (Math.random() < .3 + bonus.g*.3) { play('warn'); sfx.kgrowl(); }
+  else { play('idle'); cur.wait = rand(.6, 1.4); if (Math.random() < .3) sfx.kpurr(); }
+}
+function bonusEnd(n) {
+  if (n === 'griffe') { play('calm'); fade.dur = .25; return; }
+  if (n === 'warn') { play('warnHold'); bonus.hold = rand(.7, 1.4) - diff()*.3; return; }
+  if (n === 'final') { endBonus(); return; }
+  if (bonus.full) { startFinale(); return; }
+  play('idle'); if (n === 'fore' || n === 'back') stateT = -rand(.1, .3);
+}
+function startFinale() { bonus.fin = true; queued = null; play('final'); fade.dur = .15; sfx.kfinal(); music.duck(4.5); }
+function pawHit(dir) {
+  shake = 13; flash = 1; flashC = '255,255,255'; zoom = 1.5; hitstop = .12;
+  burst(90, 110, dir, 24, ['#ffd84a', '#ffffff']); addFloat(T.kslap, 90, 100, '#ffd84a', 4, 0, true); sfx.kslap();
+}
+function endBonus() {
+  carryT = Math.round(bonus.g*5); score += Math.round(bonus.g*500);
+  fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: .7 }; cur = null; bonus = null;
+  startTourScr();
+}
+// ---------- Fin de tour : bilan, les tampons tombent, « Ils reviennent » ----------
+function startTourScr() { tourScr = { t: 0, lap: tour + 1, next: tour + 2, ev: {} }; banner = null; queued = null; if (cur) { fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: .4 }; cur = null; } }
+function tourSfx() {
+  const s = tourScr, once = (k, at, f) => { if (s.t >= at && !s.ev[k]) { s.ev[k] = 1; f(); } };
+  for (let k = 0; k < NB; k++) once('st' + k, .35 + k*.28, () => sfx.stamp());
+  once('b1', 2.1, () => sfx.beat()); once('b2', 2.45, () => sfx.beat()); once('b3', 2.75, () => sfx.beat());
+  once('go', 3.05, () => { sfx.fight(false); shake = 10; flash = .8; flashC = '255,77,109'; });
+}
+function endTourScr() {
+  tourScr = null; tour++; koCount = 0; koNeed = Math.min(3, tour + 1);
+  setChar(0); newRound(round + 1); flash = .6; flashC = '255,255,255'; play('enter'); if (fade) fade.dur = .4;
+  if (GS) { GS.seen = GS.seen || {}; GS.seen[0] = 1; GS.tour++; checkProgress(); }
+}
 function start() {
   sfx.unlock(); timeFx = null; zones = [];
   applyPerks(); fillMissions(); missions.forEach(m => { m.done = false; if (m.t === undefined) m.t = tierOf(); }); resetGS(); gameXp = 0; doneNow = []; toasts.length = 0; rankUp = -1;
   setChar(ready(CH[startCi]) ? startCi : 0); tour = 0; koCount = 0; koNeed = 1; phase = 'play'; score = 0; hits = 0; ars = 0; kos = 0; lives = maxLives; lastDir = 0; queued = null; floats.length = 0; sparks.length = 0; timers.length = 0;
+  bonus = null; bonusN = 0; tourScr = null; carryT = 0;
   newRound(1); hpShown = 1; chain = 0; mult = 1; play('idle'); stateT = -.6;
   if (!tutDone) { tut = 0; tutT = 0; banner = null; intro = null; } else startIntro();
+  if (CH[ci].bonus) { intro = null; tut = -1; startBonus(); }                         // test : partie lancée directement sur le chaton
   after(.25, () => sfx.laugh(true));
 }
 function finish(reason) {
@@ -478,7 +562,7 @@ window.addEventListener('keydown', e => {
 let readySent = false;
 function update(dt) {
   clock += dt;
-  music.set(phase === 'play' && tut >= 0 ? 'menu' : phase === 'play' && intro && !intro.go && !intro.short ? null : phase === 'play' || phase === 'over' ? 'game' : phase === 'menu' || phase === 'troph' ? 'menu' : null, phase === 'play' && tut < 0 && time <= 5 ? 1.12 : 1);
+  music.set(phase === 'play' && tourScr && tourScr.t > 1.9 ? null : phase === 'play' && tut >= 0 ? 'menu' : phase === 'play' && intro && !intro.go && !intro.short ? null : phase === 'play' || phase === 'over' ? 'game' : phase === 'menu' || phase === 'troph' ? 'menu' : null, phase === 'play' && tut < 0 && time <= 5 ? 1.12 : 1);
   if (phase === 'load') {
     if (ready(CH[0]) && dataReady) { phase = 'menu'; play('taunt'); for (let k = 1; k < CH.length; k++) loadChar(CH[k]); if (!readySent) { readySent = true; if (YT) { try { YT.game.gameReady(); } catch (e) {} } } }
     return;
@@ -491,6 +575,8 @@ function update(dt) {
   for (let i = sparks.length - 1; i >= 0; i--) { const p = sparks[i]; p.t += dt; p.vy += 220*dt; p.x += p.vx*dt; p.y += p.vy*dt; if (p.t > p.life) sparks.splice(i, 1); }
   for (let i = floats.length - 1; i >= 0; i--) { floats[i].t += dt; if (floats[i].t > (floats[i].huge ? 1.3 : .8)) floats.splice(i, 1); }
   if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
+  if (tourScr && phase === 'play') { tourScr.t += dt; tourSfx(); if (tourScr.t > TS_END) endTourScr(); }
+  if (bonus) { bonus.lock -= dt; bonus.gs += (bonus.g - bonus.gs)*Math.min(1, dt*10); }
   if (intro) {
     intro.t += dt;
     if (!intro.go && intro.t >= INTRO_GO) { intro.go = true; flash = intro.short ? .5 : .9; flashC = '255,216,74'; shake = intro.short ? 6 : 11; zoom = intro.short ? 1.12 : 1.3; sfx.fight(intro.short); }
@@ -504,20 +590,23 @@ function update(dt) {
   if (!cur) return;
   cur.t += dt; stateT += dt;
   if (tut >= 0) { tutT += dt; if (tut === 3 && cur.name === 'down') tutStep(4); }
-  if (phase === 'play' && tut < 0 && !introLock() && !['ko', 'enter'].includes(cur.name)) {
+  if (phase === 'play' && tut < 0 && !introLock() && !['ko', 'enter'].includes(cur.name) && !(bonus && (bonus.fin || bonus.full || bonus.lock > 0))) {
     const before = Math.ceil(time); time -= dt;
     if (Math.ceil(time) < before && before <= 5 && time > 0) sfx.tick(before === 1);              // tic-tac des 5 dernières secondes
-    if (time <= 0) { time = 0; phase = 'over'; finish('time'); return; }
+    if (time <= 0) { time = 0; if (bonus) { bonus.full = true; } else { phase = 'over'; finish('time'); return; } }
   }
   const a = A[cur.key], l = localOf(cur);
   if (a.hit !== undefined && !cur.hit && l >= a.hit) {
     cur.hit = true;
-    if (cur.name === 'block') clang(); else if (cur.name === 'ko') knockout(cur); else impact(cur);
+    if (bonus) bonusHit(cur); else if (cur.name === 'block') clang(); else if (cur.name === 'ko') knockout(cur); else impact(cur);
   }
-  if ((cur.name === 'fore' || cur.name === 'back') && l >= a.free && streak >= streakMax && phase === 'play' && tut < 0 && !CH[ci].noGuard) { retaliate(); return; }
+  if ((cur.name === 'fore' || cur.name === 'back') && l >= a.free && streak >= streakMax && phase === 'play' && tut < 0 && !CH[ci].noGuard && !bonus) { retaliate(); return; }
   if (tut === 3 && (cur.name === 'fore' || cur.name === 'back') && l >= a.free) { tutPan(); return; }
   if (tut === 4 && (cur.name === 'fore' || cur.name === 'back') && l >= a.free + 3) { queued = null; play('taunt'); return; }
   if (queued && (cur.name === 'fore' || cur.name === 'back') && l >= a.free) { const q = queued; queued = null; play('idle'); slap(q); return; }
+  if (bonus && cur.name === 'final') { const l2 = localOf(cur); [[21, -1], [30, 1]].forEach(([h, d]) => { if (l2 >= h && !cur['h' + h]) { cur['h' + h] = 1; pawHit(d); } }); }
+  if (bonus && cur.name === 'warnHold') { if (stateT > bonus.hold) play('calm'); return; }
+  if (bonus && cur.name === 'idle') { if (phase === 'play' && bonus.full) startFinale(); else if (phase === 'play' && bonus.lock <= 0 && stateT > cur.wait) bonusBehavior(); return; }
   if (cur.name === 'idle') {
     if (phase === 'play') { if (tut < 0) { if (introLock()) stateT = 0; else if (stateT > cur.wait) nextBehavior(); } else if (tut === 4 && stateT > .5) play('taunt'); else if (tut === 3 && stateT > .3) tutPan(); }
     else if (stateT > 1.2) play('taunt');                                 // menu et fin : il nargue en boucle
@@ -582,7 +671,7 @@ function rich(segs, x, y, size, maxW, lh, draw) {                               
 
 // ----- En jeu (3B) -----
 function chrono(cx, cy) {                                                           // cercle 50 px, bord 3 px, camembert qui se vide, chiffre Silkscreen 17 px
-  const k = clamp(time/(ROUND_T + timeBonus), 0, 1), red = time <= 5, pop = timeFx && timeFx.t < .25 ? 1 + (1 - timeFx.t/.25)*.12 : 1;
+  const k = clamp(time/(bonus ? BONUS_T : ROUND_T + timeBonus), 0, 1), red = time <= 5, pop = timeFx && timeFx.t < .25 ? 1 + (1 - timeFx.t/.25)*.12 : 1;
   g.save(); g.translate(cx, cy); g.scale(pop, pop);
   g.save(); g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = 10*KPX; g.shadowOffsetY = 3*KPX; g.beginPath(); g.arc(0, 0, 25, 0, Math.PI*2); g.fillStyle = C.ink; g.fill(); g.restore();
   g.beginPath(); g.arc(0, 0, 22, 0, Math.PI*2); g.fillStyle = 'rgba(58,42,72,.95)'; g.fill();
@@ -599,7 +688,8 @@ function hud() {
   // gauche : score (Silkscreen 26, ombre 3 px) + ×3 (Space Grotesk 20 bold), puis la manche (12 px)
   const sw = tx(fmt(score), x0, rowY + 3, { f: 'px', size: 26, lh: 26, col: C.yel, al: 'l', sh: [[3, 3, '#000']] });
   if (mult > 1) tx('×' + mult, x0 + sw + 6, rowY + 4, { f: 'sg', size: 20, w: 700, col: C.mint, al: 'l', sh: [[0, 2, '#000']] });
-  tx(T.roundKo(round, koCount, koNeed), x0, rowY + 31, { f: 'sg', size: 12, w: 500, col: C.cream, al: 'l', glow: [1, 3, '#000'] });
+  const rtw = tx(bonus ? T.bonus : T.roundKo(round, koCount, koNeed), x0, rowY + 31, { f: 'sg', size: 12, w: bonus ? 700 : 500, col: bonus ? C.mint : C.cream, al: 'l', glow: [1, 3, '#000'] });
+  if (tour >= 1 && !bonus) tx(' · ' + T.tourN(tour + 1), x0 + rtw, rowY + 31, { f: 'sg', size: 12, w: 700, col: C.pink, al: 'l', glow: [1, 3, '#000'] });
   g.restore(); g.save(); g.translate(0, -(1 - kC)*off);
   // droite : chrono 50 px ; à sa gauche (gap 10) les cœurs 21 × 18 (gap 5) avec « +1 s » au-dessus
   chrono(x1 - 25, rowY + rowH/2);
@@ -611,8 +701,9 @@ function hud() {
   // barre d'ego : 18 px, arrondi 9, bord 1 px crème 70 %
   const by = rowY + rowH + 8 + (egoShake > 0 ? rand(-3, 3)*egoShake : 0), bw = x1 - x0;
   rr(x0 + .5, by + .5, bw - 1, 17, 9, 'rgba(22,13,28,.85)', 'rgba(255,243,224,.7)', 1);
-  if (hpShown > 0) { g.save(); rr(x0 + 1, by + 1, bw - 2, 16, 8); g.clip(); g.fillStyle = C.pink; g.fillRect(x0, by, bw*hpShown, 18); g.restore(); }
-  tx(T.ego, x0 + 8, by + 1, { f: 'sg', size: 12, w: 700, col: C.cream, al: 'l', ls: 1, lh: 16 });
+  const egoK = bonus ? bonus.gs : hpShown;
+  if (egoK > 0) { g.save(); rr(x0 + 1, by + 1, bw - 2, 16, 8); g.clip(); g.fillStyle = bonus ? C.mint : C.pink; g.fillRect(x0, by, bw*egoK, 18); g.restore(); }
+  tx(bonus ? T.purr : T.ego, x0 + 8, by + 1, { f: 'sg', size: 12, w: 700, col: C.cream, al: 'l', ls: 1, lh: 16 });
   g.restore();
   if (phase === 'play' && cur && !isBusy() && critNow() && Math.floor(clock*10) % 2 === 0) { g.strokeStyle = C.yel; g.lineWidth = 4; g.strokeRect(2, 2, WD - 4, HD() - 4); }   // cadre jaune 4 px : moment du critique
   if (tut >= 0) tutoUI();
@@ -672,6 +763,34 @@ function introUI() {
     const u = t - INTRO_GO, pop = u < .14 ? 1.9 - .9*ease(u/.14) : 1 + .04*Math.sin(Math.min(u, .5)*Math.PI*6)*Math.exp(-u*6), a = 1 - ease(clamp((u - (INTRO_END - INTRO_GO - .3))/.3, 0, 1));
     const sz = s ? 48 : 64;
     g.save(); g.translate(MID, y + 36); g.scale(pop, pop); tx(T.fightGo, 0, -sz*.6, { f: 'px', size: sz, lh: sz*1.2, col: C.yel, a, sh: [[4, 4, C.pink], [7, 7, '#000']] }); g.restore();
+  }
+}
+function tourUI() {
+  const s = tourScr, t = s.t, H = HD(), n = NB;
+  veil(Math.min(.9, t*3));
+  if (t > 2.95) { g.globalAlpha = Math.min(.5, (t - 2.95)*2); g.fillStyle = '#5c0716'; g.fillRect(-2, -2, WD + 4, H + 4); g.globalAlpha = 1; }
+  const pw = 62, ph = 110, gap = 6, px0 = MID - (n*pw + (n - 1)*gap)/2, py = H*.4;
+  for (let k = 0; k < n; k++) {
+    const c = CH[k], a = ease(clamp((t - .05 - k*.06)/.25, 0, 1)), x = px0 + k*(pw + gap), jit = t > 3.05 ? rand(-1, 1)*Math.max(0, 1 - (t - 3.05)) * 3 : 0, y = py + (1 - a)*24 + jit;
+    const an = t > 2.95 && c.A.taunt ? c.A.taunt : c.A.idle, fr = an.f[Math.floor(an.f.length*(t > 2.95 ? .45 : 0))];
+    const im = c.imgs[Math.floor(fr/c.per)]; g.globalAlpha = a;
+    if (im && im.complete && im.naturalWidth) { const l = fr % c.per; g.save(); rr(x, y, pw, ph, 6); g.clip(); g.drawImage(im, (l % COLS)*FW, Math.floor(l/COLS)*FH, FW, FH, x, y, pw, ph);
+      if (t > 2.95) { g.globalAlpha = a*Math.min(.45, (t - 2.95)*1.5); g.fillStyle = '#ff2a3d'; g.fillRect(x, y, pw, ph); } g.restore(); }
+    g.globalAlpha = a; rr(x, y, pw, ph, 6, null, t > 2.95 ? C.pink : C.line, 1.5); g.globalAlpha = 1;
+    const st = .35 + k*.28, fall = 2.0 + k*.08;
+    if (t > st) {
+      const u = t - st, pop = u < .12 ? 1.8 - .8*ease(u/.12) : 1, d = Math.max(0, t - fall), dy = d*d*900, rot = -.22 + d*2.2*(k % 2 ? 1 : -1), sa = 1 - clamp(d*2.2, 0, 1);
+      if (sa > 0) { g.save(); g.globalAlpha = sa; g.translate(x + pw/2, y + ph*.6 + dy); g.rotate(rot); g.scale(pop, pop); rr(-27, -13, 54, 26, 4, 'rgba(22,13,28,.55)', C.pink, 2.5); tx('K.O.', 0, -11, { f: 'px', size: 17, col: C.pink }); g.restore(); g.globalAlpha = 1; }
+    }
+  }
+  if (t < 2.1) { const a = ease(clamp(t/.3, 0, 1))*(1 - ease(clamp((t - 1.8)/.3, 0, 1))); tx(T.tourDone(s.lap), MID, py - 74, { f: 'px', size: 28, col: C.yel, a, sh: [[3, 3, '#000']] }); }
+  if (t > 3.05) {
+    const u = t - 3.05, pop = u < .14 ? 2 - ease(u/.14) : 1, a = 1 - ease(clamp((t - TS_END + .3)/.3, 0, 1));
+    g.save(); g.translate(MID, py - 64); g.scale(pop, pop);
+    tx(T.tourN(s.next), 0, -64, { f: 'px', size: 22, col: C.cream, a, sh: [[3, 3, '#000']] });
+    tx(T.back2, 0, -34, { f: 'px', size: 32, col: C.pink, a, sh: [[3, 3, C.yel], [5, 5, '#000']] });
+    g.restore();
+    if (u > .35) tx(T.harder(s.next), MID, py + ph + 22, { f: 'sg', size: 15, w: 700, col: C.cream, a: a*ease(clamp((u - .35)/.3, 0, 1)), glow: [1, 3, '#000'] });
   }
 }
 function bannerUI() {
@@ -819,7 +938,8 @@ function drawUI() {
     else { const size = (f.sc === 1 ? 30 : f.sc*14)*pop; tx(f.txt, fx, fy - size*.6, { f: 'px', size, col: f.c, a: a2, sh: [[3, 3, '#000']] }); }
   }
   if (phase === 'play') introVeil();
-  if (phase === 'play' || phase === 'over') hud();
+  if ((phase === 'play' || phase === 'over') && !tourScr) hud();
+  if (tourScr && phase === 'play') tourUI();
   if (toasts.length && (phase === 'play' || phase === 'over')) toastUI();
   if (banner && phase === 'play') bannerUI();
   if (intro && phase === 'play') introUI();
@@ -840,6 +960,7 @@ function render() {
   g.translate(FW/2 + Math.round(rand(-shake, shake)), FH/2 + Math.round(rand(-shake, shake))); g.scale(z, z); g.translate(-FW/2, -FH/2);
   if (cur) drawFrame(frameOf(cur), 1, CH[cur.ci !== undefined ? cur.ci : ci]);
   if (fade) drawFrame(fade.frame, 1 - ease(fade.t/fade.dur), CH[fade.ci]);
+  if (tour >= 1 && !bonus && (cur || fade) && phase !== 'menu') { g.save(); g.globalCompositeOperation = 'soft-light'; g.globalAlpha = Math.min(.32, .18*tour); g.fillStyle = '#ff3020'; g.fillRect(0, 0, FW, FH); g.restore(); }   // ils sont énervés : teinte plus chaude
   g.restore();
   for (const p of sparks) { g.fillStyle = p.c; g.globalAlpha = 1 - p.t/p.life; g.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); }
   g.globalAlpha = 1;
@@ -860,7 +981,7 @@ function render() {
 
 // ---------- Son : extraits des vidéos, fichiers du bundle ; suit le réglage audio de YouTube ----------
 const SNAMES = ['fore1', 'fore2', 'back1', 'laugh', 'clang', 'koslap', 'panup', 'pandown', 'laugh2', 'laugh3'];
-const SOUNDS = []; CH.forEach(c => { SNAMES.forEach(k => SOUNDS.push(c.sp + k)); if (c.tk) { SOUNDS.push(c.sp + 'enter'); ['taunt', 'taunt2', 'taunt3'].forEach(k => { if (c.A[k]) SOUNDS.push(c.sp + 'tk_' + k); }); } });
+const SOUNDS = []; CH.forEach(c => { if (c.bonus) { ['purr', 'pet1', 'pet2', 'growl', 'hiss', 'final'].forEach(k => SOUNDS.push(c.sp + k)); return; } SNAMES.forEach(k => SOUNDS.push(c.sp + k)); if (c.tk) { SOUNDS.push(c.sp + 'enter'); ['taunt', 'taunt2', 'taunt3'].forEach(k => { if (c.A[k]) SOUNDS.push(c.sp + 'tk_' + k); }); } });
 let audioOn = true, paused = false;
 const sfx = (() => {
   let ac = null, nb = null, master = null; const buf = {};
@@ -871,8 +992,8 @@ const sfx = (() => {
     SOUNDS.forEach(k => { fetch('' + k + '.mp3').then(r => r.arrayBuffer()).then(b => ac.decodeAudioData(b, d => { buf[k] = d; }, () => {})).catch(() => {}); });
     apply();
   };
-  const play = (k, gain, rate, delay) => {
-    k = CH[ci].sp + k;
+  const play = (k, gain, rate, delay) => playAbs(CH[ci].sp + k, gain, rate, delay);
+  const playAbs = (k, gain, rate, delay) => {
     if (!ac || !audioOn || paused || !buf[k]) return;
     const s = ac.createBufferSource(); s.buffer = buf[k]; s.playbackRate.value = rate || 1;
     const gg = ac.createGain(); gg.gain.value = gain; s.connect(gg); gg.connect(master); s.start(ac.currentTime + (delay || 0));
@@ -897,6 +1018,9 @@ const sfx = (() => {
     panDown() { play('pandown', .6, 1); if (!CH[ci].tk && Math.random() < .6) { lastLaugh = clock; play('laugh2', .7, rand(.97, 1.03), .25); } },
     laugh(force) { if (CH[ci].tk) return; if (!force && clock - lastLaugh < 3) return; lastLaugh = clock; play('laugh', .75, rand(.97, 1.03)); },
     laugh3() { lastLaugh = clock; play('laugh3', .8, 1); },
+    kpurr() { play('purr', .7, 1); }, kpet(side) { play(side === 'fore' ? 'pet2' : 'pet1', .85, 1); }, kgrowl() { play('growl', .85, 1); }, khiss() { play('hiss', 1, 1); },
+    kfinal() { play('final', .95, 1); }, kslap() { playAbs('fore1', 1, .9); playAbs('back1', .55, 1.1); },
+    stamp() { this.tones([170, 85], 'square', .09, .05); }, beat() { this.sweep(85, 38, .16, .3, 'sine'); },
     enter() { lastLaugh = clock; tkT = clock; play('enter', .8, 1); },
     taunt(key, rate) { this.stopTaunt(); const s = play('tk_' + key, .85, rate); if (s) { tkSrc = s; tkT = clock; lastLaugh = clock; } },
     stopTaunt() { if (tkSrc) { try { tkSrc.g.gain.setTargetAtTime(0, ac.currentTime, .03); tkSrc.s.stop(ac.currentTime + .15); } catch (e) {} tkSrc = null; } },
