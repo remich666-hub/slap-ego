@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Slap Ego</title>
+<script defer src="https://cloud.umami.is/script.js" data-website-id="6acb70fb-89df-4030-a892-79520a7cd666"></script>
 </head>
 <body>
 <style>
@@ -434,6 +435,7 @@ function onEnd() {
       fade = { frame: frameOf(cur), t: 0, ci: cur.ci !== undefined ? cur.ci : ci, dur: k === ci ? .09 : .4 }; cur = null;
       if (k !== ci) flash = .6, flashC = '255,255,255';
       setChar(k); newRound(round + 1); if (same) banner.sub = T.up; play('enter'); if (CH[k].tk) { if (CH[k].enterSnd) fade.dur = .4; sfx.enter(); }
+      if (!same) track('perso', { nom: CH[k].name.fr, tour: tour + 1 });
       if (GS && !same) { GS.seen = GS.seen || {}; GS.seen[k] = 1; GS.reach = Math.max(GS.reach, k); if (k === 0) GS.tour++; checkProgress(); }
     }
     return;
@@ -443,8 +445,11 @@ function onEnd() {
 // ---------- Bonus chaton : on le caresse, il ne faut pas insister quand il est agacé ; à la fin, c'est lui qui gifle ----------
 function newPat() { return Math.max(1, 2 + Math.floor(Math.random()*3) - (bonus && bonus.g > .5 ? 1 : 0)); }   // patience : 2 à 4 caresses d'affilée, moins quand la jauge monte
 function kAnnoyed() { queued = null; play('warn'); sfx.kgrowl(); bonus.pat = newPat(); }
+// ---------- Statistiques (Umami, version web seulement) : sans effet si le script n'est pas chargé ----------
+function track(n, d) { try { if (window.umami && umami.track) umami.track(n, d); } catch (e) {} }
 function lapEnd() { if (KI >= 0 && ready(CH[KI]) && bonusN < 2) startBonus(); else startTourScr(); }
 function startBonus() {
+  track('chaton', { tour: tour + 1 });
   bonusN++; bonus = { g: 0, gs: 0, full: false, fin: false, lock: 1.3, hold: 1, pat: 0, clean: true }; bonus.pat = newPat();
   setChar(KI); flash = .6; flashC = '255,255,255'; time = BONUS_T; queued = null; streak = 0;
   banner = { txt: T.bonus, sub: T.bonusSub, t: 0 };
@@ -483,7 +488,7 @@ function bonusEnd(n) {
   if ((n === 'fore' || n === 'back') && bonus.pat <= 0) { kAnnoyed(); return; }   // il en a assez des caresses
   play('idle'); if (n === 'fore' || n === 'back') stateT = -rand(.1, .3);
 }
-function startFinale() { if (bonus.clean && bonus.g >= 1) { addFloat(T.perfect, 90, 150, '#ffd84a', 1, .1, true); sfx.mission(); }
+function startFinale() { if (bonus.clean && bonus.g >= 1) { track('caresse-parfaite', { tour: tour + 1 }); addFloat(T.perfect, 90, 150, '#ffd84a', 1, .1, true); sfx.mission(); }
   bonus.fin = true; queued = null; play('final'); fade.dur = .15; sfx.kfinal(); music.duck(4.5); }
 function pawHit(dir) {
   shake = 13; flash = 1; flashC = '255,255,255'; zoom = 1.5; hitstop = .12;
@@ -503,12 +508,12 @@ function tourSfx() {
   once('go', 3.05, () => { sfx.fight(false); shake = 10; flash = .8; flashC = '255,77,109'; });
 }
 function endTourScr() {
-  tourScr = null; tour++; koCount = 0; koNeed = Math.min(3, tour + 1);
+  tourScr = null; tour++; track('tour', { n: tour + 1 }); koCount = 0; koNeed = Math.min(3, tour + 1);
   setChar(0); newRound(round + 1); flash = .6; flashC = '255,255,255'; play('enter'); if (fade) fade.dur = .4;
   if (GS) { GS.seen = GS.seen || {}; GS.seen[0] = 1; GS.tour++; checkProgress(); }
 }
 function start() {
-  sfx.unlock(); timeFx = null; zones = [];
+  sfx.unlock(); timeFx = null; zones = []; track('partie', { langue: T === L.fr ? 'fr' : 'en' });
   applyPerks(); fillMissions(); missions.forEach(m => { m.done = false; if (m.t === undefined) m.t = tierOf(); }); resetGS(); gameXp = 0; doneNow = []; toasts.length = 0; rankUp = -1;
   setChar(ready(CH[startCi]) ? startCi : 0); tour = 0; koCount = 0; koNeed = 1; phase = 'play'; score = 0; hits = 0; ars = 0; kos = 0; lives = maxLives; lastDir = 0; queued = null; floats.length = 0; sparks.length = 0; timers.length = 0;
   bonus = null; bonusN = 0; tourScr = null; carryT = 0;
@@ -518,6 +523,7 @@ function start() {
   after(.25, () => sfx.laugh(true));
 }
 function finish(reason) {
+  track('fin', { score, tour: tour + 1, perso: CH[ci].name.fr, raison: reason });
   phase = 'end'; endT = 0; toasts.length = 0;
   if (reason === 'time') play('taunt');
   after(.3, () => sfx.laugh(true));
