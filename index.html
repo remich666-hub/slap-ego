@@ -25,7 +25,7 @@ const YT = (typeof ytgame !== 'undefined' && ytgame && ytgame.game) ? ytgame : n
 const L = {
   fr: { load: 'CHARGEMENT', tapPlay: 'TOUCHE POUR JOUER', tapAgain: 'TOUCHE POUR REJOUER', best: 'RECORD', newBest: 'NOUVEAU RECORD!', round: n => 'MANCHE ' + n, ego: 'EGO',
     sub: 'VIDE SON EGO AVANT LA FIN DU CHRONO', tut: ['GLISSE VERS LA GAUCHE', 'GLISSE VERS LA DROITE', 'ALTERNE VITE = X2', 'POELE: NE TAPE PAS!', 'IL TIRE LA LANGUE: GIFLE = CRITIQUE!'], go: 'A TOI !', ready: 'PRÊT ?', fightGo: 'BAFFE !',
-    ar: 'ALLER-RETOUR!', crit: 'CRITIQUE!', pow: ['PAF!', 'CLAC!', 'SBAM!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'AIE...', fight: 'GIFLE!', bonus: 'BONUS!', bonusSub: 'Caresse-le... pas trop', purr: 'RONRON', pet: ['PRRR!', 'RON RON!', 'MRRR!'], scratch: 'GRRR!', kslap: 'SLAP!', tourDone: n => 'TOUR ' + n + ' OK!', back2: 'ILS REVIENNENT', tourN: n => 'TOUR ' + n, harder: n => n >= 3 ? '3 K.O. chacun · encore plus rapides' : '2 K.O. chacun · plus rapides · feintes', bonusT: n => '+' + n + ' s pour la suite', perfect: 'CARESSE PARFAITE!', up: 'IL SE RELEVE!', out: ' EST K.O.!',
+    ar: 'ALLER-RETOUR!', crit: 'CRITIQUE!', pow: ['PAF!', 'CLAC!', 'SBAM!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'AIE...', fight: 'GIFLE!', bonus: 'BONUS!', bonusSub: 'Caresse-le... pas trop', purr: 'RONRON', pet: ['PRRR!', 'RON RON!', 'MRRR!'], scratch: 'GRRR!', kslap: 'SLAP!', tourDone: n => 'TOUR ' + n + ' OK!', back2: 'ILS REVIENNENT', tourN: n => 'TOUR ' + n, harder: n => n >= 3 ? '3 K.O. chacun · encore plus rapides' : '2 K.O. chacun · plus rapides · feintes', bonusT: n => '+' + n + ' s pour la suite', perfect: ['CARESSE', 'PARFAITE!'], up: 'IL SE RELEVE!', out: ' EST K.O.!',
     endLives: 'TA MAIN A LACHE', endTime: 'IL A TENU BON...', stats: (h, a, k) => h + ' CLAQUES - ' + a + ' ALLERS-RETOURS - ' + k + ' K.O.',
     sub2: 'Vide son ego avant la fin du chrono', missions: 'MISSIONS', missionOk: 'MISSION OK !', trophy: 'TROPHÉE !', trophies: 'TROPHÉES', back: 'TOUCHE POUR REVENIR', newRank: 'NOUVEAU RANG!', next: 'PROCHAIN:',
     ranks: ['MAIN MOLLE', 'TAPOTEUR', 'CLAQUEUR', 'GIFLEUR', 'BAFFEUR', "PAUME D'OR", 'MAIN DE FER', 'ROI DE LA BAFFE', 'LÉGENDE DE LA BAFFE'],
@@ -48,7 +48,7 @@ const L = {
       'quand le cadre jaune clignote, gifle : coup critique, et +1 s au chrono.', 'enchaîne sans te faire bloquer pour monter le multiplicateur (+1 s à chaque palier, 5 s max par manche).'] },
   en: { load: 'LOADING', tapPlay: 'TAP TO PLAY', tapAgain: 'TAP TO PLAY AGAIN', best: 'BEST', newBest: 'NEW BEST!', round: n => 'ROUND ' + n, ego: 'EGO',
     sub: 'DRAIN HIS EGO BEFORE TIME RUNS OUT', tut: ['SWIPE LEFT', 'SWIPE RIGHT', 'ALTERNATE FAST = X2', 'FRYING PAN: DO NOT HIT!', 'TONGUE OUT: SLAP = CRITICAL!'], go: 'YOUR TURN!', ready: 'READY?', fightGo: 'SLAP!',
-    ar: 'DOUBLE SLAP!', crit: 'CRITICAL!', pow: ['WHAP!', 'SMACK!', 'SLAP!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'OUCH...', fight: 'SLAP!', bonus: 'BONUS!', bonusSub: 'Pet him... not too much', purr: 'PURR', pet: ['PRRR!', 'PURR!', 'MRRR!'], scratch: 'HISSS!', kslap: 'SLAP!', tourDone: n => 'LAP ' + n + ' CLEAR!', back2: 'THEY ARE BACK', tourN: n => 'LAP ' + n, harder: n => n >= 3 ? '3 K.O. each · even faster' : '2 K.O. each · faster · feints', bonusT: n => '+' + n + ' s for later', perfect: 'PERFECT PETTING!', up: 'HE GETS UP!', out: ' IS OUT!',
+    ar: 'DOUBLE SLAP!', crit: 'CRITICAL!', pow: ['WHAP!', 'SMACK!', 'SLAP!'], clang: 'BOOONG!', ko: 'K.O.!', ouch: 'OUCH...', fight: 'SLAP!', bonus: 'BONUS!', bonusSub: 'Pet him... not too much', purr: 'PURR', pet: ['PRRR!', 'PURR!', 'MRRR!'], scratch: 'HISSS!', kslap: 'SLAP!', tourDone: n => 'LAP ' + n + ' CLEAR!', back2: 'THEY ARE BACK', tourN: n => 'LAP ' + n, harder: n => n >= 3 ? '3 K.O. each · even faster' : '2 K.O. each · faster · feints', bonusT: n => '+' + n + ' s for later', perfect: ['PERFECT', 'PETTING!'], up: 'HE GETS UP!', out: ' IS OUT!',
     endLives: 'YOUR HAND GAVE UP', endTime: 'HE HELD ON...', stats: (h, a, k) => h + ' SLAPS - ' + a + ' DOUBLE SLAPS - ' + k + ' K.O.',
     sub2: 'Drain his ego before time runs out', missions: 'MISSIONS', missionOk: 'MISSION DONE!', trophy: 'TROPHY!', trophies: 'TROPHIES', back: 'TAP TO GO BACK', newRank: 'NEW RANK!', next: 'NEXT:',
     ranks: ['SOFT HAND', 'TAPPER', 'SLAPPER', 'SMACKER', 'WALLOPER', 'GOLDEN PALM', 'IRON HAND', 'SLAP KING', 'SLAP LEGEND'],
@@ -465,13 +465,13 @@ function bonusSlap(kind) {
 }
 function bonusHit(c) {
   if (c.name === 'griffe' || c.name === 'griffe2') {
-    bonus.g = Math.max(0, bonus.g - .4); bonus.clean = false; chain = 0; mult = 1; time = Math.max(0, time - 2); addFloat('-2 s', 90, 150, '#ff4d6d', 1, .15);
+    bonus.g = Math.max(0, Math.round((bonus.g - .4)*100)/100); bonus.clean = false; chain = 0; mult = 1; time = Math.max(0, time - 2); addFloat('-2 s', 90, 150, '#ff4d6d', 1, .15);
     shake = 9; flash = 1; flashC = '255,77,109'; zoom = 1; hitstop = .08;
     burst(96, 130, 0, 18, ['#ff4d6d', '#ffffff']); addFloat(T.scratch, 90, 84, '#ff4d6d', 3); sfx.khiss(c.name === 'griffe2');
     return;
   }
   const dir = c.dir || (c.name === 'fore' ? -1 : 1);
-  bonus.g = Math.min(1, bonus.g + .1); bonus.pat--; score += 20; hits++;
+  bonus.g = Math.min(1, Math.round((bonus.g + .1)*100)/100); bonus.pat--; score += 20; hits++;   // arrondi : 10 × 0,1 ne fait pas exactement 1 en virgule flottante
   zoom = .35; burst(dir < 0 ? 104 : 74, 112, 0, 8, ['#ff9ebb', '#ffffff']);
   addFloat(pick(T.pet), dir < 0 ? 112 : 68, 92, '#7ff0c0', 1); sfx.kpet(c.name, c.key !== c.name);
   if (bonus.g >= 1 && !bonus.full) { bonus.full = true; addFloat(T.purr + '!', 90, 150, '#ffd84a', 2, .2); sfx.timeBonus(); }
@@ -488,7 +488,7 @@ function bonusEnd(n) {
   if ((n === 'fore' || n === 'back') && bonus.pat <= 0) { kAnnoyed(); return; }   // il en a assez des caresses
   play('idle'); if (n === 'fore' || n === 'back') stateT = -rand(.1, .3);
 }
-function startFinale() { if (bonus.clean && bonus.g >= 1) { track('caresse-parfaite', { tour: tour + 1 }); addFloat(T.perfect, 90, 150, '#ffd84a', 1, .1, true); sfx.mission(); }
+function startFinale() { if (bonus.clean && bonus.g >= 1) { track('caresse-parfaite', { tour: tour + 1 }); T.perfect.forEach((s, i) => addFloat(s, 90, 142 + i*16, '#ffd84a', 1, .1, true)); sfx.mission(); }   // texte sur deux lignes : sinon ça dépasse
   bonus.fin = true; queued = null; play('final'); fade.dur = .15; sfx.kfinal(); music.duck(4.5); }
 function pawHit(dir) {
   shake = 13; flash = 1; flashC = '255,255,255'; zoom = 1.5; hitstop = .12;
